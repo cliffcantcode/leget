@@ -1,3 +1,5 @@
+use chrono::offset::Utc;
+use chrono::Datelike;
 use clap::{Parser, Subcommand, ValueEnum};
 
 #[derive(Parser)]
@@ -20,7 +22,6 @@ enum YearMode {
     All,
 }
 
-// TODO: add query for scraping
 struct Query {
     years: Option<Vec<u16>>,
 }
@@ -34,23 +35,34 @@ impl Query {
         let _ = self.years.take();
         self.years = Some(years);
     }
+
+    fn set_current_year(&mut self) {
+        self.set_years(vec![current_year()]);
+    }
+}
+
+fn current_year() -> u16 {
+    let date = Utc::today();
+    date.year().try_into().unwrap()
 }
 
 fn main() {
     let cli = Cli::parse();
 
+    let mut query = Query::new();
+
     match &cli.command {
         Commands::Year { mode } => match mode {
             Some(YearMode::None) => println!("None"),
-            Some(YearMode::Current) => println!("{}", 2022),
+            // get current year and push it to our query
+            Some(YearMode::Current) => query.set_current_year(),
             Some(YearMode::All) => println!("All"),
+            // default to current year
             None => {
-                println!("{}", 2022);
+                query.set_current_year();
             }
         },
     }
 
-    let mut query = Query::new();
-    query.set_years(vec![2022]);
     println!("{:?}", query.years.unwrap()[0]);
 }
