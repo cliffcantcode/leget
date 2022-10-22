@@ -1,26 +1,20 @@
 use chrono::offset::Utc;
 use chrono::Datelike;
-use clap::{Parser, Subcommand, ValueEnum};
+use clap::Parser;
 
 const MIN_YEAR_BRICK_ECONOMY: u16 = 1949;
 
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
 struct Cli {
-    #[command(subcommand)]
-    command: Commands,
-}
+    // try to limit inputs to just valid years
+    #[arg(value_parser = clap::value_parser!(u16).range(1949..2200))]
+    #[arg(short, long, num_args=1..100)]
+    years: Option<Vec<u16>>,
 
-#[derive(Subcommand)]
-enum Commands {
-    /// scrapes lego sets by year made
-    Year { mode: Option<YearMode> },
-}
-
-#[derive(Clone, Ord, PartialOrd, Eq, PartialEq, ValueEnum)]
-enum YearMode {
-    All,
-    Current,
+    // use full range of years from 1949 (oldest on brickeconomy)
+    #[arg(long, default_value_t = false)]
+    all_years: bool,
 }
 
 struct Query {
@@ -35,10 +29,6 @@ impl Query {
     fn set_years(&mut self, years: Vec<u16>) {
         let _ = self.years.take();
         self.years = Some(years);
-    }
-
-    fn set_current_year(&mut self) {
-        self.set_years(vec![current_year()]);
     }
 
     fn set_all_years(&mut self) {
@@ -57,17 +47,12 @@ fn main() {
 
     let mut query = Query::new();
 
-    match &cli.command {
-        Commands::Year { mode } => match mode {
-            // get current year and push it to our query
-            Some(YearMode::Current) => query.set_current_year(),
-            // use full range of years from 1949 (oldest on brickeconomy)
-            Some(YearMode::All) => query.set_all_years(),
-            // default to current year
-            None => {
-                query.set_current_year();
-            }
-        },
+    if cli.all_years {
+        query.set_all_years();
+    }
+
+    if let Some(years) = cli.years {
+        query.set_years(years);
     }
 
     if query.years.is_some() {
