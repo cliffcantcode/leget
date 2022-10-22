@@ -9,11 +9,11 @@ const MIN_YEAR_BRICK_ECONOMY: u16 = 1949;
 struct Cli {
     // try to limit inputs to just valid years
     #[arg(value_parser = clap::value_parser!(u16).range(1949..2200))]
-    #[arg(short, long, num_args=1..100)]
+    #[arg(short, long, group="year", num_args=1..100)]
     years: Option<Vec<u16>>,
 
     // use full range of years from 1949 (oldest on brickeconomy)
-    #[arg(long, default_value_t = false)]
+    #[arg(long, group = "year")]
     all_years: bool,
 }
 
