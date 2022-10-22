@@ -2,6 +2,8 @@ use chrono::offset::Utc;
 use chrono::Datelike;
 use clap::{Parser, Subcommand, ValueEnum};
 
+const MIN_YEAR_BRICK_ECONOMY: u16 = 1949;
+
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
 struct Cli {
@@ -17,9 +19,8 @@ enum Commands {
 
 #[derive(Clone, Ord, PartialOrd, Eq, PartialEq, ValueEnum)]
 enum YearMode {
-    None,
-    Current,
     All,
+    Current,
 }
 
 struct Query {
@@ -39,6 +40,11 @@ impl Query {
     fn set_current_year(&mut self) {
         self.set_years(vec![current_year()]);
     }
+
+    fn set_all_years(&mut self) {
+        let all_years: Vec<u16> = (MIN_YEAR_BRICK_ECONOMY..=current_year()).collect();
+        self.set_years(all_years);
+    }
 }
 
 fn current_year() -> u16 {
@@ -53,10 +59,10 @@ fn main() {
 
     match &cli.command {
         Commands::Year { mode } => match mode {
-            Some(YearMode::None) => println!("None"),
             // get current year and push it to our query
             Some(YearMode::Current) => query.set_current_year(),
-            Some(YearMode::All) => println!("All"),
+            // use full range of years from 1949 (oldest on brickeconomy)
+            Some(YearMode::All) => query.set_all_years(),
             // default to current year
             None => {
                 query.set_current_year();
@@ -64,5 +70,7 @@ fn main() {
         },
     }
 
-    println!("{:?}", query.years.unwrap()[0]);
+    if query.years.is_some() {
+        println!("{:?}", query.years.unwrap());
+    }
 }
