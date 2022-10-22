@@ -1,4 +1,4 @@
-use clap::{Parser, ValueEnum, Subcommand};
+use clap::{Parser, Subcommand, ValueEnum};
 
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
@@ -45,11 +45,11 @@ fn main() {
             Some(YearMode::Current) => println!("{}", 2022),
             Some(YearMode::All) => println!("All"),
             None => {
-                println!("{}", 2022); 
+                println!("{}", 2022);
             }
-        }
+        },
     }
-    
+
     let mut query = Query::new();
     query.set_years(vec![2022]);
     println!("{:?}", query.years.unwrap()[0]);
