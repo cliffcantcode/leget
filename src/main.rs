@@ -60,7 +60,9 @@ async fn main() {
         println!("{:?}", query.years.as_ref().unwrap());
     }
 
-    // We can scrape the site once query settings are ready
+    // We can scrape the site once our query settings are ready
+    let client = reqwest::Client::new();
+
     // TODO: make this iterate through all years in query
     if let Some(years_vec) = query.years {
         let url = format!(
@@ -68,7 +70,15 @@ async fn main() {
             year = years_vec[0]
         );
 
-        let result = reqwest::get(url).await;
-        println!("{:?}", result);
+        let response = client.get(url).send().await.unwrap();
+
+        match response.status() {
+            reqwest::StatusCode::OK => {
+                println!("{:?}", response);
+            }
+            problem => {
+                panic!("There was a problem: {:?}", problem);
+            }
+        };
     }
 }
