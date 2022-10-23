@@ -42,7 +42,8 @@ fn current_year() -> u16 {
     date.year().try_into().unwrap()
 }
 
-fn main() {
+#[tokio::main]
+async fn main() {
     let cli = Cli::parse();
 
     let mut query = Query::new();
@@ -56,6 +57,18 @@ fn main() {
     }
 
     if query.years.is_some() {
-        println!("{:?}", query.years.unwrap());
+        println!("{:?}", query.years.as_ref().unwrap());
+    }
+
+    // We can scrape the site once query settings are ready
+    // TODO: make this iterate through all years in query
+    if let Some(years_vec) = query.years {
+        let url = format!(
+            "https://www.brickeconomy.com/sets/year/{year}",
+            year = years_vec[0]
+        );
+
+        let result = reqwest::get(url).await;
+        println!("{:?}", result);
     }
 }
