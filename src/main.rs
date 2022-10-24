@@ -90,17 +90,9 @@ async fn main() {
             reqwest::StatusCode::OK => {
                 let content = response.text().await.unwrap();
                 let document = Html::parse_document(&content);
-                let main_table = document
-                    .select(&TABLE)
-                    .max_by_key(|table| table.select(&TR).count())
-                    .expect("No tables found in the document?");
-                for row in main_table.select(&TR) {
-                    // TODO: We need to get down to H4 I think
-                    let entries = row.select(&TD).collect::<Vec<_>>();
-                    for cell in entries.iter() {
-                        println!("{:?}", cell);
-                    }
-                }
+                let h4_a_selector = Selector::parse("h4 a").unwrap();
+                let h4 = document.select(&h4_a_selector).next().unwrap();
+                println!("{}", h4.inner_html());
             }
             problem => {
                 panic!("There was a problem: {:?}", problem);
