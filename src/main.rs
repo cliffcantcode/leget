@@ -94,7 +94,7 @@ async fn main() {
                     .select(&TABLE)
                     .max_by_key(|table| table.select(&TR).count())
                     .expect("No tables found in the document?");
-                for row in main_table.select(&TR).next() {
+                for row in main_table.select(&TR) {
                     // TODO: We need to get down to H4 I think
                     let entries = row.select(&TD).collect::<Vec<_>>();
                     for cell in entries.iter() {
