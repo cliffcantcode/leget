@@ -1,8 +1,8 @@
 use chrono::offset::Utc;
 use chrono::Datelike;
 use clap::Parser;
-use scraper::{Html, Selector};
 use lazy_static::lazy_static;
+use scraper::{Html, Selector};
 
 const MIN_YEAR_BRICK_ECONOMY: u16 = 1949;
 
@@ -90,17 +90,16 @@ async fn main() {
             reqwest::StatusCode::OK => {
                 let content = response.text().await.unwrap();
                 let document = Html::parse_document(&content);
-                let main_table = document.select(&TABLE).max_by_key(|table| {
-                    table.select(&TR).count()
-                }).expect("No tables found in the document?");
-                for row in main_table.select(&TR) {
+                let main_table = document
+                    .select(&TABLE)
+                    .max_by_key(|table| table.select(&TR).count())
+                    .expect("No tables found in the document?");
+                for row in main_table.select(&TR).next() {
                     // TODO: We need to get down to H4 I think
                     let entries = row.select(&TD).collect::<Vec<_>>();
                     for cell in entries.iter() {
                         println!("{:?}", cell);
-                        break;
                     }
-                    break;
                 }
             }
             problem => {
