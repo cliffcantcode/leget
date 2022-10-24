@@ -1,8 +1,22 @@
 use chrono::offset::Utc;
 use chrono::Datelike;
 use clap::Parser;
+use scraper::{Html, Selector};
+use lazy_static::lazy_static;
 
 const MIN_YEAR_BRICK_ECONOMY: u16 = 1949;
+
+// Convience function to avoid unwrap()ing all the time
+fn make_selector(selector: &str) -> Selector {
+    Selector::parse(selector).unwrap()
+}
+
+lazy_static! {
+    static ref TABLE: Selector = make_selector("table");
+    static ref TR: Selector = make_selector("tr");
+    static ref H4: Selector = make_selector("h4");
+    static ref TD: Selector = make_selector("td");
+}
 
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
@@ -74,7 +88,20 @@ async fn main() {
 
         match response.status() {
             reqwest::StatusCode::OK => {
-                println!("{:?}", response);
+                let content = response.text().await.unwrap();
+                let document = Html::parse_document(&content);
+                let main_table = document.select(&TABLE).max_by_key(|table| {
+                    table.select(&TR).count()
+                }).expect("No tables found in the document?");
+                for row in main_table.select(&TR) {
+                    // TODO: We need to get down to H4 I think
+                    let entries = row.select(&TD).collect::<Vec<_>>();
+                    for cell in entries.iter() {
+                        println!("{:?}", cell);
+                        break;
+                    }
+                    break;
+                }
             }
             problem => {
                 panic!("There was a problem: {:?}", problem);
