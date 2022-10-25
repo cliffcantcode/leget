@@ -100,7 +100,29 @@ async fn main() {
 
     // Scrape by set numbers
     // TODO: left off here
-    if let Some(_range) = query.set_number_range {}
+    if let Some(range) = query.set_number_range {
+        let url = format!(
+            "https://www.brickeconomy.com/set/{set_number}-1/",
+            set_number = range[0]
+        );
+
+        let response = client.get(url).send().await.unwrap();
+
+        match response.status() {
+            reqwest::StatusCode::OK => {
+                let content = response.text().await.unwrap();
+                let document = Html::parse_document(&content);
+                let td_h1_selector = Selector::parse("td h1").unwrap();
+                let h1 = document.select(&td_h1_selector);
+                for item in h1 {
+                    println!("{:?}", item.html());
+                }
+            }
+            problem => {
+                panic!("There was a problem: {:?}", problem);
+            }
+        }
+    }
 
     // TODO: make this iterate through all years in query
     if let Some(years_vec) = query.years {
