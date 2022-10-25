@@ -29,15 +29,23 @@ struct Cli {
     // use full range of years from 1949 (oldest on brickeconomy)
     #[arg(long, group = "year")]
     all_years: bool,
+
+    // scrape by set number
+    #[arg(short, long, num_args = 2)]
+    set_number_range: Option<Vec<u32>>,
 }
 
 struct Query {
     years: Option<Vec<u16>>,
+    set_number_range: Option<Vec<u32>>,
 }
 
 impl Query {
     fn new() -> Self {
-        Query { years: None }
+        Query {
+            years: None,
+            set_number_range: None,
+        }
     }
 
     fn set_years(&mut self, years: Vec<u16>) {
@@ -48,6 +56,11 @@ impl Query {
     fn set_all_years(&mut self) {
         let all_years: Vec<u16> = (MIN_YEAR_BRICK_ECONOMY..=current_year()).collect();
         self.set_years(all_years);
+    }
+
+    fn set_set_number_range(&mut self, set_numbers: Vec<u32>) {
+        let _ = self.set_number_range.take();
+        self.set_number_range = Some(set_numbers);
     }
 }
 
@@ -74,8 +87,20 @@ async fn main() {
         println!("{:?}", query.years.as_ref().unwrap());
     }
 
+    if let Some(set_numbers) = cli.set_number_range {
+        query.set_set_number_range(set_numbers);
+    }
+
+    if query.set_number_range.is_some() {
+        println!("{:?}", query.set_number_range.as_ref().unwrap());
+    }
+
     // We can scrape the site once our query settings are ready
     let client = reqwest::Client::new();
+
+    // Scrape by set numbers
+    // TODO: left off here
+    if let Some(_range) = query.set_number_range {}
 
     // TODO: make this iterate through all years in query
     if let Some(years_vec) = query.years {
@@ -91,8 +116,10 @@ async fn main() {
                 let content = response.text().await.unwrap();
                 let document = Html::parse_document(&content);
                 let h4_a_selector = Selector::parse("h4 a").unwrap();
-                let h4 = document.select(&h4_a_selector).next().unwrap();
-                println!("{}", h4.inner_html());
+                let h4 = document.select(&h4_a_selector);
+                for item in h4 {
+                    println!("{}", item.inner_html());
+                }
             }
             problem => {
                 panic!("There was a problem: {:?}", problem);
