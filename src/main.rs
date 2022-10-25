@@ -36,6 +36,22 @@ struct Cli {
     set_number_range: Option<Vec<u32>>,
 }
 
+struct SetData {
+    // TODO: Needs to handle multiple values
+    name: Option<String>,
+}
+
+impl SetData {
+    fn new() -> Self {
+        SetData { name: None }
+    }
+
+    fn push_name(&mut self, new_name: String) {
+        let _ = self.name.take();
+        self.name = Some(new_name);
+    }
+}
+
 struct Query {
     years: Option<Vec<u16>>,
     set_number_range: Option<Vec<u32>>,
@@ -101,30 +117,32 @@ async fn main() {
 
     // Scrape by set numbers
     if let Some(range) = query.set_number_range {
-        let url = format!(
-            "https://www.brickeconomy.com/set/{set_number}-1/",
-            set_number = range[0]
-        );
+        for set_number in range[0]..=range[1] {
+            let url = format!(
+                "https://www.brickeconomy.com/set/{number}-1/",
+                number = set_number
+            );
 
-        // TODO: is there a way to get this to play nice with async?
-        scraper_utils::throttle();
-        let response = client.get(url).send().await.unwrap();
+            // TODO: is there a way to get this to play nice with async?
+            scraper_utils::throttle();
+            let response = client.get(url).send().await.unwrap();
 
-        // TODO: we need to see what the missing set number pages
-        // look like, but I want a throddled get() before I start
-        // hitting multiple pages
-        match response.status() {
-            reqwest::StatusCode::OK => {
-                let content = response.text().await.unwrap();
-                let document = Html::parse_document(&content);
-                let td_h1_selector = Selector::parse("td h1").unwrap();
-                let h1 = document.select(&td_h1_selector);
-                for item in h1 {
-                    println!("{:?}", item.html());
+            // TODO: we need to see what the missing set number pages
+            // look like, but I want a throddled get() before I start
+            // hitting multiple pages
+            match response.status() {
+                reqwest::StatusCode::OK => {
+                    let content = response.text().await.unwrap();
+                    let document = Html::parse_document(&content);
+                    let td_h1_selector = Selector::parse("td h1").unwrap();
+                    let h1 = document.select(&td_h1_selector);
+                    for item in h1 {
+                        println!("{:?}", item.inner_html());
+                    }
                 }
-            }
-            problem => {
-                panic!("There was a problem: {:?}", problem);
+                problem => {
+                    panic!("There was a problem: {:?}", problem);
+                }
             }
         }
     }
