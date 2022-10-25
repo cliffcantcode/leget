@@ -1,3 +1,4 @@
+mod scraper_utils;
 use chrono::offset::Utc;
 use chrono::Datelike;
 use clap::Parser;
@@ -14,8 +15,8 @@ fn make_selector(selector: &str) -> Selector {
 lazy_static! {
     static ref TABLE: Selector = make_selector("table");
     static ref TR: Selector = make_selector("tr");
-    static ref H4: Selector = make_selector("h4");
     static ref TD: Selector = make_selector("td");
+    static ref H4: Selector = make_selector("h4");
 }
 
 #[derive(Parser)]
@@ -99,15 +100,19 @@ async fn main() {
     let client = reqwest::Client::new();
 
     // Scrape by set numbers
-    // TODO: left off here
     if let Some(range) = query.set_number_range {
         let url = format!(
             "https://www.brickeconomy.com/set/{set_number}-1/",
             set_number = range[0]
         );
 
+        // TODO: is there a way to get this to play nice with async?
+        scraper_utils::throttle();
         let response = client.get(url).send().await.unwrap();
 
+        // TODO: we need to see what the missing set number pages
+        // look like, but I want a throddled get() before I start
+        // hitting multiple pages
         match response.status() {
             reqwest::StatusCode::OK => {
                 let content = response.text().await.unwrap();
