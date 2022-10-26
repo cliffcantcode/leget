@@ -38,7 +38,7 @@ struct Cli {
 
 struct SetData {
     // TODO: Needs to handle multiple values
-    name: Option<String>,
+    name: Option<Vec<String>>,
 }
 
 impl SetData {
@@ -47,8 +47,11 @@ impl SetData {
     }
 
     fn push_name(&mut self, new_name: String) {
-        let _ = self.name.take();
-        self.name = Some(new_name);
+        if let Some(names) = self.name.as_mut() {
+            names.push(new_name);
+        } else {
+            self.name = Some(vec![new_name]);
+        }
     }
 }
 
@@ -91,6 +94,7 @@ async fn main() {
     let cli = Cli::parse();
 
     let mut query = Query::new();
+    let mut set_data = SetData::new();
 
     if cli.all_years {
         query.set_all_years();
@@ -127,9 +131,6 @@ async fn main() {
             scraper_utils::throttle();
             let response = client.get(url).send().await.unwrap();
 
-            // TODO: we need to see what the missing set number pages
-            // look like, but I want a throddled get() before I start
-            // hitting multiple pages
             match response.status() {
                 reqwest::StatusCode::OK => {
                     let content = response.text().await.unwrap();
@@ -137,7 +138,7 @@ async fn main() {
                     let td_h1_selector = Selector::parse("td h1").unwrap();
                     let h1 = document.select(&td_h1_selector);
                     for item in h1 {
-                        println!("{:?}", item.inner_html());
+                        set_data.push_name(item.inner_html());
                     }
                 }
                 problem => {
@@ -171,4 +172,6 @@ async fn main() {
             }
         };
     }
+
+    println!("Names: {:?}", set_data.name);
 }
