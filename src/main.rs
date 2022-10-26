@@ -38,20 +38,12 @@ struct Cli {
 
 struct SetData {
     // TODO: Needs to handle multiple values
-    name: Option<Vec<String>>,
+    name: Vec<String>,
 }
 
 impl SetData {
     fn new() -> Self {
-        SetData { name: None }
-    }
-
-    fn push_name(&mut self, new_name: String) {
-        if let Some(names) = self.name.as_mut() {
-            names.push(new_name);
-        } else {
-            self.name = Some(vec![new_name]);
-        }
+        SetData { name: vec![] }
     }
 }
 
@@ -138,7 +130,7 @@ async fn main() {
                     let td_h1_selector = Selector::parse("td h1").unwrap();
                     let h1 = document.select(&td_h1_selector);
                     for item in h1 {
-                        set_data.push_name(item.inner_html());
+                        set_data.name.push(item.inner_html());
                     }
                 }
                 problem => {
