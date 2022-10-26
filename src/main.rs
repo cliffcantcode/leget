@@ -127,10 +127,17 @@ async fn main() {
                 reqwest::StatusCode::OK => {
                     let content = response.text().await.unwrap();
                     let document = Html::parse_document(&content);
-                    let td_h1_selector = Selector::parse("td h1").unwrap();
-                    let h1 = document.select(&td_h1_selector);
-                    for item in h1 {
-                        set_data.name.push(item.inner_html());
+                    let table_tr_td_h1_selector = Selector::parse("table tr td h1").unwrap();
+                    let table_tr_td_div_span_selector =
+                        Selector::parse("table tr td div span").unwrap();
+                    // TODO: should probably get this from the 'set details' part of the page
+                    let mut h1 = document.select(&table_tr_td_h1_selector);
+                    let mut listing_price = document.select(&table_tr_td_div_span_selector);
+                    // only push other data if there is a name
+                    if let Some(name) = h1.next() {
+                        // push one item at a time incase there are multiple
+                        set_data.name.push(name.inner_html());
+                        println!("{:?}", listing_price.next().unwrap().inner_html());
                     }
                 }
                 problem => {
