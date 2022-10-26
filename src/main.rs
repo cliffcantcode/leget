@@ -37,13 +37,16 @@ struct Cli {
 }
 
 struct SetData {
-    // TODO: Needs to handle multiple values
     name: Vec<String>,
+    listed_price: Vec<Option<String>>,
 }
 
 impl SetData {
     fn new() -> Self {
-        SetData { name: vec![] }
+        SetData {
+            name: vec![],
+            listed_price: vec![],
+        }
     }
 }
 
@@ -132,12 +135,14 @@ async fn main() {
                         Selector::parse("table tr td div span").unwrap();
                     // TODO: should probably get this from the 'set details' part of the page
                     let mut h1 = document.select(&table_tr_td_h1_selector);
-                    let mut listing_price = document.select(&table_tr_td_div_span_selector);
+                    let mut listed_price = document.select(&table_tr_td_div_span_selector);
                     // only push other data if there is a name
                     if let Some(name) = h1.next() {
                         // push one item at a time incase there are multiple
                         set_data.name.push(name.inner_html());
-                        println!("{:?}", listing_price.next().unwrap().inner_html());
+                        set_data
+                            .listed_price
+                            .push(Some(listed_price.next().unwrap().inner_html()));
                     }
                 }
                 problem => {
@@ -172,5 +177,8 @@ async fn main() {
         };
     }
 
-    println!("Names: {:?}", set_data.name);
+    println!(
+        "Names: {:?}\nListed Prices: {:?}",
+        set_data.name, set_data.listed_price
+    );
 }
