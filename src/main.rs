@@ -37,6 +37,7 @@ struct Cli {
 }
 
 struct SetData {
+    set_number: Vec<String>,
     name: Vec<String>,
     listed_price: Vec<Option<String>>,
 }
@@ -44,6 +45,7 @@ struct SetData {
 impl SetData {
     fn new() -> Self {
         SetData {
+            set_number: vec![],
             name: vec![],
             listed_price: vec![],
         }
@@ -130,16 +132,40 @@ async fn main() {
                 reqwest::StatusCode::OK => {
                     let content = response.text().await.unwrap();
                     let document = Html::parse_document(&content);
+                    // TODO: a lot of these selectors should probably be static
+                    let set_details_selector = Selector::parse("div#SetDetails div.row").unwrap();
+                    let col_xs_5_selector = Selector::parse("div.col-xs-5").unwrap();
+                    let col_xs_7_selector = Selector::parse("div.col-xs-7").unwrap();
                     let table_tr_td_h1_selector = Selector::parse("table tr td h1").unwrap();
                     let table_tr_td_div_span_a_selector =
                         Selector::parse("table#sales_region_table tr td div span.a").unwrap();
                     // TODO: should probably get this from the 'set details' part of the page
                     let mut h1 = document.select(&table_tr_td_h1_selector);
                     let mut listed_price = document.select(&table_tr_td_div_span_a_selector);
+                    let set_details = document.select(&set_details_selector);
+
                     // only push other data if there is a name
                     if let Some(name) = h1.next() {
                         // push one item at a time incase there are multiple
+                        // push set number (as a string because of the '-')
+                        for detail in set_details {
+                            let mut header = detail.select(&col_xs_5_selector);
+                            let mut item = detail.select(&col_xs_7_selector);
+
+                            if let Some(header) = header.next() {
+                                match header.inner_html().as_str() {
+                                    "Set number" => {
+                                        set_data.set_number.push(item.next().unwrap().inner_html())
+                                    }
+                                    _ => continue,
+                                }
+                            }
+                        }
+
+                        // push name
                         set_data.name.push(name.inner_html());
+
+                        // push listed price
                         if let Some(price) = listed_price.next() {
                             set_data.listed_price.push(Some(price.inner_html()));
                         } else {
@@ -180,7 +206,7 @@ async fn main() {
     }
 
     println!(
-        "Names: {:?}\nListed Prices: {:?}",
-        set_data.name, set_data.listed_price
+        "Set numbers: {:?}\nNames: {:?}\nListed Prices: {:?}",
+        set_data.set_number, set_data.name, set_data.listed_price
     );
 }
