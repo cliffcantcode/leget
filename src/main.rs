@@ -3,6 +3,7 @@ use chrono::offset::Utc;
 use chrono::Datelike;
 use clap::Parser;
 use lazy_static::lazy_static;
+use regex::Regex;
 use scraper::{Html, Selector};
 
 const MIN_YEAR_BRICK_ECONOMY: u16 = 1949;
@@ -13,10 +14,14 @@ fn make_selector(selector: &str) -> Selector {
 }
 
 lazy_static! {
+    // create selectors
     static ref TABLE: Selector = make_selector("table");
     static ref TR: Selector = make_selector("tr");
     static ref TD: Selector = make_selector("td");
     static ref H4: Selector = make_selector("h4");
+
+    // create regular expressions
+    static ref RE_NUMBER_THEN_AMPERSAND: Regex = Regex::new(r"(\d+,?\d+)&").unwrap();
 }
 
 #[derive(Parser)]
@@ -40,7 +45,8 @@ struct SetData {
     set_number: Vec<String>,
     name: Vec<String>,
     listed_price: Vec<Option<String>>,
-    pieces: Vec<Option<String>>,
+    // u16 (65_535) since current largest set is only 11_695 pieces
+    pieces: Vec<Option<u16>>,
 }
 
 impl SetData {
@@ -166,9 +172,17 @@ async fn main() {
                                     "Pieces" => {
                                         if let Some(pieces) = item.next() {
                                             // TODO: fix truncate
-                                            let mut piece_count = pieces.inner_html();
-                                            piece_count.truncate(5);
-                                            set_data.pieces.push(Some(piece_count));
+                                            let piece_count = pieces.inner_html();
+                                            let numbers = RE_NUMBER_THEN_AMPERSAND
+                                                .captures(&piece_count)
+                                                .unwrap();
+                                            let piece_count =
+                                                numbers[1].split(',').collect::<String>();
+                                            if let Ok(count) = piece_count.parse::<u16>() {
+                                                set_data.pieces.push(Some(count));
+                                            } else {
+                                                set_data.pieces.push(None);
+                                            }
                                         } else {
                                             set_data.pieces.push(None);
                                         }
