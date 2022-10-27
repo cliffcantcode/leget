@@ -40,6 +40,7 @@ struct SetData {
     set_number: Vec<String>,
     name: Vec<String>,
     listed_price: Vec<Option<String>>,
+    pieces: Vec<Option<String>>,
 }
 
 impl SetData {
@@ -48,6 +49,7 @@ impl SetData {
             set_number: vec![],
             name: vec![],
             listed_price: vec![],
+            pieces: vec![],
         }
     }
 }
@@ -145,7 +147,8 @@ async fn main() {
                     let set_details = document.select(&set_details_selector);
 
                     // only push other data if there is a name
-                    if let Some(name) = h1.next() {
+                    // TODO: need to change this now that name comes from set details
+                    if let Some(_name) = h1.next() {
                         // push one item at a time incase there are multiple
                         // push set number (as a string because of the '-')
                         for detail in set_details {
@@ -157,13 +160,26 @@ async fn main() {
                                     "Set number" => {
                                         set_data.set_number.push(item.next().unwrap().inner_html())
                                     }
+                                    "Name" => {
+                                        set_data.name.push(item.next().unwrap().inner_html());
+                                    }
+                                    "Pieces" => {
+                                        if let Some(pieces) = item.next() {
+                                            // TODO: fix truncate
+                                            let mut piece_count = pieces.inner_html();
+                                            piece_count.truncate(5);
+                                            set_data.pieces.push(Some(piece_count));
+                                        } else {
+                                            set_data.pieces.push(None);
+                                        }
+                                    }
                                     _ => continue,
                                 }
                             }
                         }
 
                         // push name
-                        set_data.name.push(name.inner_html());
+                        // set_data.name.push(name.inner_html());
 
                         // push listed price
                         if let Some(price) = listed_price.next() {
@@ -206,7 +222,7 @@ async fn main() {
     }
 
     println!(
-        "Set numbers: {:?}\nNames: {:?}\nListed Prices: {:?}",
-        set_data.set_number, set_data.name, set_data.listed_price
+        "Set numbers: {:?}\nNames: {:?}\nListed Prices: {:?}\nPieces: {:?}",
+        set_data.set_number, set_data.name, set_data.listed_price, set_data.pieces
     );
 }
