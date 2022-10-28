@@ -43,9 +43,13 @@ struct Cli {
 }
 
 struct SetData {
+    // can't be a number because it's formatted with a '-'
     set_number: Vec<String>,
+
     name: Vec<String>,
-    listed_price: Vec<Option<String>>,
+
+    listed_price: Vec<Option<f32>>,
+
     // u16 (65_535) since current largest set is only 11_695 pieces
     pieces: Vec<Option<u16>>,
 }
@@ -196,8 +200,11 @@ async fn main() {
                         if let Some(price) = listed_price.next() {
                             let price = price.inner_html();
                             let price = RE_DOLLARS.captures(&price).unwrap();
-                            let price = &price[1];
-                            set_data.listed_price.push(Some(price.to_string()));
+                            if let Ok(price) = price[1].parse::<f32>() {
+                                set_data.listed_price.push(Some(price));
+                            } else {
+                                set_data.listed_price.push(None);
+                            }
                         } else {
                             set_data.listed_price.push(None);
                         }
@@ -234,6 +241,23 @@ async fn main() {
             }
         };
     }
+
+    // make sure the index len is the same before we make a dataframe
+    assert_eq!(
+        &set_data.set_number.len(),
+        &set_data.name.len(),
+        "Set number and name  columns aren't the same length."
+    );
+    assert_eq!(
+        &set_data.set_number.len(),
+        &set_data.listed_price.len(),
+        "Name and listed price columns aren't the same length."
+    );
+    assert_eq!(
+        &set_data.set_number.len(),
+        &set_data.pieces.len(),
+        "Name and pieces columns aren't the same length."
+    );
 
     println!(
         "Set numbers: {:?}\nNames: {:?}\nListed Prices: {:?}\nPieces: {:?}",
