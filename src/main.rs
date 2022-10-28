@@ -24,7 +24,10 @@ lazy_static! {
     static ref COL_XS_5: Selector = make_selector("div.col-xs-5");
     static ref COL_XS_7: Selector = make_selector("div.col-xs-7");
     static ref TABLE_TR_TD_H1: Selector = make_selector("table tr td h1");
+    // gets listed price
     static ref TABLE_TR_TD_DIV_SPAN_A: Selector = make_selector("table#sales_region_table tr td div span.a");
+    // it literally says 'placeholder' so this might break
+    static ref RETAIL_PRICE_SELECTOR: Selector = make_selector("div#ContentPlaceHolder1_PanelSetPricing div.row");
 
     // create regular expressions
     static ref RE_NUMBER_THEN_AMPERSAND: Regex = Regex::new(r"(\d+,?\d+)&").unwrap();
@@ -56,6 +59,8 @@ struct SetData {
 
     listed_price: Vec<Option<f32>>,
 
+    retail_price: Vec<Option<f32>>,
+
     // u16 (65_535) since current largest set is only 11_695 pieces
     pieces: Vec<Option<u16>>,
 }
@@ -66,6 +71,7 @@ impl SetData {
             set_number: vec![],
             name: vec![],
             listed_price: vec![],
+            retail_price: vec![],
             pieces: vec![],
         }
     }
@@ -128,10 +134,6 @@ async fn main() {
         query.set_set_number_range(set_numbers);
     }
 
-    if query.set_number_range.is_some() {
-        println!("{:?}", query.set_number_range.as_ref().unwrap());
-    }
-
     // We can scrape the site once our query settings are ready
     let client = reqwest::Client::new();
 
@@ -151,12 +153,9 @@ async fn main() {
                 reqwest::StatusCode::OK => {
                     let content = response.text().await.unwrap();
                     let document = Html::parse_document(&content);
-                    // TODO: should probably get this from the 'set details' part of the page
-                    let mut listed_price = document.select(&TABLE_TR_TD_DIV_SPAN_A);
+
                     let set_details = document.select(&SET_DETAILS);
 
-                    // only push other data if there is a name
-                    // TODO: need to change this now that name comes from set details
                     // push one item at a time incase there are multiple
                     // push set number (as a string because of the '-')
                     if set_data.set_number.len() == set_data.name.len() {
@@ -193,8 +192,10 @@ async fn main() {
                                     _ => continue,
                                 }
 
-                                // push listed price, but only once per valid set
+                                // push other items only once per valid set number
                                 if header.as_str() == "Set number" {
+                                    // push listed price
+                                    let mut listed_price = document.select(&TABLE_TR_TD_DIV_SPAN_A);
                                     if let Some(price) = listed_price.next() {
                                         let price = price.inner_html();
                                         let price = RE_DOLLARS.captures(&price).unwrap();
@@ -205,6 +206,26 @@ async fn main() {
                                         }
                                     } else {
                                         set_data.listed_price.push(None);
+                                    }
+
+                                    // push retail price
+                                    let retail_price = document.select(&RETAIL_PRICE_SELECTOR);
+                                    for price in retail_price {
+                                        let mut header = price.select(&COL_XS_5);
+                                        let mut item = price.select(&COL_XS_7);
+
+                                        let header = header.next().unwrap().inner_html();
+                                        if header.as_str() == "Retail price" {
+                                            if let Some(price) = item.next() {
+                                                let price = price.inner_html();
+                                                let price = RE_DOLLARS.captures(&price).unwrap();
+                                                if let Ok(price) = price[1].parse::<f32>() {
+                                                    set_data.retail_price.push(Some(price));
+                                                }
+                                            } else {
+                                                set_data.retail_price.push(None);
+                                            }
+                                        }
                                     }
                                 }
                             }
@@ -255,12 +276,21 @@ async fn main() {
     );
     assert_eq!(
         &set_data.set_number.len(),
+        &set_data.retail_price.len(),
+        "Name and retail price columns aren't the same length."
+    );
+    assert_eq!(
+        &set_data.set_number.len(),
         &set_data.pieces.len(),
         "Name and pieces columns aren't the same length."
     );
 
     println!(
-        "Set numbers: {:?}\nNames: {:?}\nListed Prices: {:?}\nPieces: {:?}",
-        set_data.set_number, set_data.name, set_data.listed_price, set_data.pieces
+        "Set numbers: {:?}\nNames: {:?}\nListed Prices: {:?}\nRetail Prices: {:?}\nPieces: {:?}",
+        set_data.set_number,
+        set_data.name,
+        set_data.listed_price,
+        set_data.retail_price,
+        set_data.pieces
     );
 }
