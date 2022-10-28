@@ -19,6 +19,12 @@ lazy_static! {
     static ref TR: Selector = make_selector("tr");
     static ref TD: Selector = make_selector("td");
     static ref H4: Selector = make_selector("h4");
+    static ref H4_A: Selector = make_selector("h4 a");
+    static ref SET_DETAILS: Selector = make_selector("div#SetDetails div.row");
+    static ref COL_XS_5: Selector = make_selector("div.col-xs-5");
+    static ref COL_XS_7: Selector = make_selector("div.col-xs-7");
+    static ref TABLE_TR_TD_H1: Selector = make_selector("table tr td h1");
+    static ref TABLE_TR_TD_DIV_SPAN_A: Selector = make_selector("table#sales_region_table tr td div span.a");
 
     // create regular expressions
     static ref RE_NUMBER_THEN_AMPERSAND: Regex = Regex::new(r"(\d+,?\d+)&").unwrap();
@@ -146,16 +152,10 @@ async fn main() {
                     let content = response.text().await.unwrap();
                     let document = Html::parse_document(&content);
                     // TODO: a lot of these selectors should probably be static
-                    let set_details_selector = Selector::parse("div#SetDetails div.row").unwrap();
-                    let col_xs_5_selector = Selector::parse("div.col-xs-5").unwrap();
-                    let col_xs_7_selector = Selector::parse("div.col-xs-7").unwrap();
-                    let table_tr_td_h1_selector = Selector::parse("table tr td h1").unwrap();
-                    let table_tr_td_div_span_a_selector =
-                        Selector::parse("table#sales_region_table tr td div span.a").unwrap();
                     // TODO: should probably get this from the 'set details' part of the page
-                    let mut h1 = document.select(&table_tr_td_h1_selector);
-                    let mut listed_price = document.select(&table_tr_td_div_span_a_selector);
-                    let set_details = document.select(&set_details_selector);
+                    let mut h1 = document.select(&TABLE_TR_TD_H1);
+                    let mut listed_price = document.select(&TABLE_TR_TD_DIV_SPAN_A);
+                    let set_details = document.select(&SET_DETAILS);
 
                     // only push other data if there is a name
                     // TODO: need to change this now that name comes from set details
@@ -163,8 +163,8 @@ async fn main() {
                         // push one item at a time incase there are multiple
                         // push set number (as a string because of the '-')
                         for detail in set_details {
-                            let mut header = detail.select(&col_xs_5_selector);
-                            let mut item = detail.select(&col_xs_7_selector);
+                            let mut header = detail.select(&COL_XS_5);
+                            let mut item = detail.select(&COL_XS_7);
 
                             if let Some(header) = header.next() {
                                 match header.inner_html().as_str() {
@@ -230,8 +230,7 @@ async fn main() {
             reqwest::StatusCode::OK => {
                 let content = response.text().await.unwrap();
                 let document = Html::parse_document(&content);
-                let h4_a_selector = Selector::parse("h4 a").unwrap();
-                let h4 = document.select(&h4_a_selector);
+                let h4 = document.select(&H4_A);
                 for item in h4 {
                     println!("{}", item.inner_html());
                 }
