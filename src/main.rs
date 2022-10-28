@@ -22,6 +22,7 @@ lazy_static! {
 
     // create regular expressions
     static ref RE_NUMBER_THEN_AMPERSAND: Regex = Regex::new(r"(\d+,?\d+)&").unwrap();
+    static ref RE_DOLLARS: Regex = Regex::new(r"^\$(\d+\.?\d+)$").unwrap();
 }
 
 #[derive(Parser)]
@@ -171,7 +172,6 @@ async fn main() {
                                     }
                                     "Pieces" => {
                                         if let Some(pieces) = item.next() {
-                                            // TODO: fix truncate
                                             let piece_count = pieces.inner_html();
                                             let numbers = RE_NUMBER_THEN_AMPERSAND
                                                 .captures(&piece_count)
@@ -192,12 +192,12 @@ async fn main() {
                             }
                         }
 
-                        // push name
-                        // set_data.name.push(name.inner_html());
-
                         // push listed price
                         if let Some(price) = listed_price.next() {
-                            set_data.listed_price.push(Some(price.inner_html()));
+                            let price = price.inner_html();
+                            let price = RE_DOLLARS.captures(&price).unwrap();
+                            let price = &price[1];
+                            set_data.listed_price.push(Some(price.to_string()));
                         } else {
                             set_data.listed_price.push(None);
                         }
