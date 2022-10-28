@@ -31,7 +31,7 @@ lazy_static! {
 
     // create regular expressions
     static ref RE_NUMBER_THEN_AMPERSAND: Regex = Regex::new(r"(\d+,?\d+)&").unwrap();
-    static ref RE_DOLLARS: Regex = Regex::new(r"^\$(\d+\.?\d+)$").unwrap();
+    static ref RE_DOLLARS: Regex = Regex::new(r"\$(\d+\.?\d+)").unwrap();
 }
 
 #[derive(Parser)]
@@ -57,9 +57,13 @@ struct SetData {
 
     name: Vec<String>,
 
-    listed_price: Vec<Option<f32>>,
-
     retail_price: Vec<Option<f32>>,
+
+    // either market price or brickeconomy estimate
+    value: Vec<Option<f32>>,
+
+    // a seller's price; should be cheapest but not guaranteed
+    listed_price: Vec<Option<f32>>,
 
     // u16 (65_535) since current largest set is only 11_695 pieces
     pieces: Vec<Option<u16>>,
@@ -70,8 +74,9 @@ impl SetData {
         SetData {
             set_number: vec![],
             name: vec![],
-            listed_price: vec![],
             retail_price: vec![],
+            value: vec![],
+            listed_price: vec![],
             pieces: vec![],
         }
     }
@@ -217,11 +222,6 @@ async fn main() {
                                         for header in headers {
                                             let header_html = header.inner_html();
                                             let item = items.next();
-                                            println!(
-                                                "Header: {:?}\nValue: {:?}",
-                                                &header_html,
-                                                &item.unwrap().inner_html()
-                                            );
                                             if header_html.as_str() == "Retail price" {
                                                 if let Some(price) = item {
                                                     let price = price.inner_html();
@@ -235,17 +235,30 @@ async fn main() {
                                                 }
                                             }
 
+                                            // push value
+                                            // as either market price or brickeconomy estimate
+                                            // depending if the set is still availible at retail
                                             // some headers are further nested
                                             let value_selector =
                                                 Selector::parse("span.helppopover").unwrap();
-                                            let values = header.select(&value_selector);
-                                            for value in values {
-                                                let value = value.inner_html();
-                                                if value.as_str() == "Value" {
-                                                    println!(
-                                                        "Value item found: {:?}",
-                                                        &item.unwrap().inner_html()
-                                                    );
+                                            let value_headers = header.select(&value_selector);
+                                            for value_header in value_headers {
+                                                let value_header = value_header.inner_html();
+                                                if value_header.as_str() == "Value"
+                                                    || value_header.as_str() == "Market price"
+                                                {
+                                                    if let Some(value) = item {
+                                                        let value = value.inner_html();
+                                                        let value =
+                                                            RE_DOLLARS.captures(&value).unwrap();
+                                                        if let Ok(value) = value[1].parse::<f32>() {
+                                                            set_data.value.push(Some(value));
+                                                        } else {
+                                                            set_data.value.push(None);
+                                                        }
+                                                    } else {
+                                                        set_data.value.push(None);
+                                                    }
                                                 }
                                             }
                                         }
@@ -294,13 +307,18 @@ async fn main() {
     );
     assert_eq!(
         &set_data.set_number.len(),
-        &set_data.listed_price.len(),
-        "Name and listed price columns aren't the same length."
+        &set_data.retail_price.len(),
+        "Name and retail price columns aren't the same length."
     );
     assert_eq!(
         &set_data.set_number.len(),
-        &set_data.retail_price.len(),
-        "Name and retail price columns aren't the same length."
+        &set_data.value.len(),
+        "Name and value columns aren't the same length."
+    );
+    assert_eq!(
+        &set_data.set_number.len(),
+        &set_data.listed_price.len(),
+        "Name and listed price columns aren't the same length."
     );
     assert_eq!(
         &set_data.set_number.len(),
@@ -309,11 +327,12 @@ async fn main() {
     );
 
     println!(
-        "Set numbers: {:?}\nNames: {:?}\nListed Prices: {:?}\nRetail Prices: {:?}\nPieces: {:?}",
+        "Set numbers: {:?}\nNames: {:?}\nRetail Prices: {:?}\nValue: {:?}\nListed Prices: {:?}\nPieces: {:?}",
         set_data.set_number,
         set_data.name,
-        set_data.listed_price,
         set_data.retail_price,
+        set_data.value,
+        set_data.listed_price,
         set_data.pieces
     );
 }
