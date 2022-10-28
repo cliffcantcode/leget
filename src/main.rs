@@ -151,23 +151,22 @@ async fn main() {
                 reqwest::StatusCode::OK => {
                     let content = response.text().await.unwrap();
                     let document = Html::parse_document(&content);
-                    // TODO: a lot of these selectors should probably be static
                     // TODO: should probably get this from the 'set details' part of the page
-                    let mut h1 = document.select(&TABLE_TR_TD_H1);
                     let mut listed_price = document.select(&TABLE_TR_TD_DIV_SPAN_A);
                     let set_details = document.select(&SET_DETAILS);
 
                     // only push other data if there is a name
                     // TODO: need to change this now that name comes from set details
-                    if let Some(_name) = h1.next() {
-                        // push one item at a time incase there are multiple
-                        // push set number (as a string because of the '-')
+                    // push one item at a time incase there are multiple
+                    // push set number (as a string because of the '-')
+                    if set_data.set_number.len() == set_data.name.len() {
                         for detail in set_details {
                             let mut header = detail.select(&COL_XS_5);
                             let mut item = detail.select(&COL_XS_7);
 
                             if let Some(header) = header.next() {
-                                match header.inner_html().as_str() {
+                                let header = header.inner_html();
+                                match header.as_str() {
                                     "Set number" => {
                                         set_data.set_number.push(item.next().unwrap().inner_html())
                                     }
@@ -193,20 +192,22 @@ async fn main() {
                                     }
                                     _ => continue,
                                 }
-                            }
-                        }
 
-                        // push listed price
-                        if let Some(price) = listed_price.next() {
-                            let price = price.inner_html();
-                            let price = RE_DOLLARS.captures(&price).unwrap();
-                            if let Ok(price) = price[1].parse::<f32>() {
-                                set_data.listed_price.push(Some(price));
-                            } else {
-                                set_data.listed_price.push(None);
+                                // push listed price, but only once per valid set
+                                if header.as_str() == "Set number" {
+                                    if let Some(price) = listed_price.next() {
+                                        let price = price.inner_html();
+                                        let price = RE_DOLLARS.captures(&price).unwrap();
+                                        if let Ok(price) = price[1].parse::<f32>() {
+                                            set_data.listed_price.push(Some(price));
+                                        } else {
+                                            set_data.listed_price.push(None);
+                                        }
+                                    } else {
+                                        set_data.listed_price.push(None);
+                                    }
+                                }
                             }
-                        } else {
-                            set_data.listed_price.push(None);
                         }
                     }
                 }
