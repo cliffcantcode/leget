@@ -3,6 +3,7 @@ use chrono::offset::Utc;
 use chrono::Datelike;
 use clap::Parser;
 use lazy_static::lazy_static;
+use polars::prelude::*;
 use regex::Regex;
 use scraper::{Html, Selector};
 
@@ -66,7 +67,8 @@ struct SetData {
     listed_price: Vec<Option<f32>>,
 
     // u16 (65_535) since current largest set is only 11_695 pieces
-    pieces: Vec<Option<u16>>,
+    // not u16 because polars::perlude::NamedFrom isn't impled for Vec<Option<u16>>?
+    pieces: Vec<Option<f32>>,
 }
 
 impl SetData {
@@ -185,7 +187,7 @@ async fn main() {
                                                 .unwrap();
                                             let piece_count =
                                                 numbers[1].split(',').collect::<String>();
-                                            if let Ok(count) = piece_count.parse::<u16>() {
+                                            if let Ok(count) = piece_count.parse::<f32>() {
                                                 set_data.pieces.push(Some(count));
                                             } else {
                                                 set_data.pieces.push(None);
@@ -326,13 +328,36 @@ async fn main() {
         "Name and pieces columns aren't the same length."
     );
 
-    println!(
-        "Set numbers: {:?}\nNames: {:?}\nRetail Prices: {:?}\nValue: {:?}\nListed Prices: {:?}\nPieces: {:?}",
-        set_data.set_number,
-        set_data.name,
-        set_data.retail_price,
-        set_data.value,
-        set_data.listed_price,
-        set_data.pieces
-    );
+    // TODO: A lot of these floats need to be rounded due to precision issue
+    let s_set_number = Series::new("set_number", &set_data.set_number);
+    let s_name = Series::new("name", &set_data.name);
+    let s_retail_price = Series::new("retail_price", &set_data.retail_price);
+    let s_value = Series::new("value", &set_data.value);
+    let s_listed_price = Series::new("listed_price", &set_data.listed_price);
+    let s_pieces = Series::new("pieces", &set_data.pieces);
+
+    let df: PolarsResult<DataFrame> = DataFrame::new(vec![
+        s_set_number,
+        s_name,
+        s_retail_price,
+        s_value,
+        s_listed_price,
+        s_pieces,
+    ]);
+
+    let lf: LazyFrame = df.unwrap().lazy();
+    let lf = lf
+        .with_column(
+            ((col("listed_price") - col("value")) / col("value"))
+                .alias("percent_discount_from_value"),
+        )
+        // TODO: I would like to not be repeating myself here
+        // TODO: make discount by % / piece
+        .with_column(
+            ((col("listed_price") - col("value")) / col("value"))
+                .alias("percent_discount_from_value_per_piece"),
+        )
+        .sort("percent_discount_from_value_per_piece", Default::default());
+    let lf = lf.collect().unwrap();
+    println!("{:?}", lf);
 }
