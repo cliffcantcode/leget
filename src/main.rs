@@ -28,7 +28,7 @@ lazy_static! {
     // gets listed price
     static ref TABLE_TR_TD_DIV_SPAN_A: Selector = make_selector("table#sales_region_table tr td div span.a");
     // it literally says 'placeholder' so this might break
-    static ref RETAIL_PRICE_SELECTOR: Selector = make_selector("#ContentPlaceHolder1_PanelSetPricing div.row");
+    static ref PRICE_ROWS_SELECTOR: Selector = make_selector("#ContentPlaceHolder1_PanelSetPricing div.row");
 
     // create regular expressions
     // if there is no ',' then the regex fails to find a second "set" of digits
@@ -171,6 +171,9 @@ async fn main() {
                             let mut header = detail.select(&COL_XS_5);
                             let mut item = detail.select(&COL_XS_7);
 
+                            // sometimes a header is repeated; e.g. new and used Value
+                            let mut value_header_count = 0;
+
                             if let Some(header) = header.next() {
                                 let header = header.inner_html();
                                 match header.as_str() {
@@ -202,6 +205,8 @@ async fn main() {
 
                                 // push other items only once per valid set number
                                 if header.as_str() == "Set number" {
+                                    println!("Set number: {:?}", set_data.set_number.last());
+
                                     // push listed price
                                     let mut listed_price = document.select(&TABLE_TR_TD_DIV_SPAN_A);
                                     if let Some(price) = listed_price.next() {
@@ -216,36 +221,77 @@ async fn main() {
                                         set_data.listed_price.push(None);
                                     }
 
-                                    // push retail price
-                                    println!("Set number: {:?}", set_data.set_number.last());
-                                    let retail_price = document.select(&RETAIL_PRICE_SELECTOR);
-                                    for row in retail_price {
+                                    // push prices
+                                    let price_rows = document.select(&PRICE_ROWS_SELECTOR);
+                                    for row in price_rows {
                                         let headers = row.select(&COL_XS_5);
                                         let mut items = row.select(&COL_XS_7);
 
                                         for header in headers {
                                             let header_html = header.inner_html();
                                             let item = items.next();
-                                            if header_html.as_str() == "Retail price" {
-                                                if let Some(price) = item {
-                                                    let price = price.inner_html();
-                                                    let price = RE_DOLLARS.captures(&price);
-                                                    if price.is_none() {
-                                                        set_data.retail_price.push(None);
+
+                                            println!(
+                                                "Value header number: {:?}",
+                                                &value_header_count
+                                            );
+                                            println!(
+                                                "header: {:?} | item: {:?}",
+                                                &header.html(),
+                                                &item.unwrap().html()
+                                            );
+
+                                            match header_html.as_str() {
+                                                "Retail price" => {
+                                                    if let Some(price) = item {
+                                                        let price = price.inner_html();
+                                                        let price = RE_DOLLARS.captures(&price);
+                                                        if price.is_none() {
+                                                            set_data.retail_price.push(None);
+                                                        } else {
+                                                            let price = price.unwrap();
+                                                            if let Ok(price) =
+                                                                price[1].parse::<f32>()
+                                                            {
+                                                                set_data
+                                                                    .retail_price
+                                                                    .push(Some(price));
+                                                            }
+                                                        }
                                                     } else {
-                                                        let price = price.unwrap();
-                                                        if let Ok(price) = price[1].parse::<f32>() {
-                                                            set_data.retail_price.push(Some(price));
+                                                        set_data.retail_price.push(None);
+                                                    }
+                                                }
+                                                // as either market price or brickeconomy estimate
+                                                // depending if the set is still availible at retail
+                                                "Value" | "Market price" => {
+                                                    // sometimes there are both new and used
+                                                    // values; new seems to be first
+                                                    value_header_count += 1;
+                                                    if value_header_count == 1 {
+                                                        if let Some(price) = item {
+                                                            // not using inner html since sometimes
+                                                            // there is an additional <b> nested
+                                                            let price = price.html();
+                                                            let price = RE_DOLLARS.captures(&price);
+                                                            if price.is_none() {
+                                                                set_data.value.push(None);
+                                                            } else {
+                                                                let price = price.unwrap();
+                                                                if let Ok(price) =
+                                                                    price[1].parse::<f32>()
+                                                                {
+                                                                    set_data
+                                                                        .value
+                                                                        .push(Some(price));
+                                                                }
+                                                            }
                                                         }
                                                     }
-                                                } else {
-                                                    set_data.retail_price.push(None);
                                                 }
+                                                _ => continue,
                                             }
 
-                                            // push value
-                                            // as either market price or brickeconomy estimate
-                                            // depending if the set is still availible at retail
                                             // some headers are further nested
                                             let value_selector =
                                                 Selector::parse("span.helppopover").unwrap();
@@ -255,6 +301,7 @@ async fn main() {
                                                 if value_header.as_str() == "Value"
                                                     || value_header.as_str() == "Market price"
                                                 {
+                                                    value_header_count += 1;
                                                     if let Some(value) = item {
                                                         let value = value.inner_html();
                                                         let value =
@@ -267,28 +314,15 @@ async fn main() {
                                                     } else {
                                                         set_data.value.push(None);
                                                     }
-
-                                                    // TODO: fix this for 10097 - 10399
-                                                    // might need to go deeper
-                                                    if set_data.value.len() < set_data.name.len() {
-                                                        let b_selector = Selector::parse("b").unwrap();
-                                                        let values = item.unwrap().select(&b_selector);
-                                                        for value in values {
-                                                            let value = value.inner_html();
-                                                            let value =
-                                                                RE_DOLLARS.captures(&value).unwrap();
-                                                            if let Ok(value) = value[1].parse::<f32>() {
-                                                                set_data.value.push(Some(value));
-                                                            } else {
-                                                                set_data.value.push(None);
-                                                            }
-                                                        }
-                                                    }
                                                 }
                                             }
                                         }
                                     }
-                                    println!("value: {:?}, value len: {:?}", set_data.value.last(), set_data.value.len());
+                                    println!(
+                                        "value: {:?}, value len: {:?}",
+                                        set_data.value.last(),
+                                        set_data.value.len()
+                                    );
                                 }
                             }
                         }
