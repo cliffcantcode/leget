@@ -28,11 +28,12 @@ lazy_static! {
     // gets listed price
     static ref TABLE_TR_TD_DIV_SPAN_A: Selector = make_selector("table#sales_region_table tr td div span.a");
     // it literally says 'placeholder' so this might break
-    static ref RETAIL_PRICE_SELECTOR: Selector = make_selector("div#ContentPlaceHolder1_PanelSetPricing div.row");
+    static ref RETAIL_PRICE_SELECTOR: Selector = make_selector("#ContentPlaceHolder1_PanelSetPricing div.row");
 
     // create regular expressions
-    static ref RE_NUMBER_THEN_AMPERSAND: Regex = Regex::new(r"(\d+,?\d+)&").unwrap();
-    static ref RE_DOLLARS: Regex = Regex::new(r"\$(\d+\.?\d+)").unwrap();
+    // if there is no ',' then the regex fails to find a second "set" of digits
+    static ref RE_NUMBER_THEN_AMPERSAND: Regex = Regex::new(r"(\d+,?\d?+)&?").unwrap();
+    static ref RE_DOLLARS: Regex = Regex::new(r"\$(\d+,?\d?+\.?\d?+)").unwrap();
 }
 
 #[derive(Parser)]
@@ -182,9 +183,9 @@ async fn main() {
                                     "Pieces" => {
                                         if let Some(pieces) = item.next() {
                                             let piece_count = pieces.inner_html();
-                                            let numbers = RE_NUMBER_THEN_AMPERSAND
-                                                .captures(&piece_count)
-                                                .unwrap();
+                                            let numbers =
+                                                RE_NUMBER_THEN_AMPERSAND.captures(&piece_count);
+                                            let numbers = numbers.unwrap();
                                             let piece_count =
                                                 numbers[1].split(',').collect::<String>();
                                             if let Ok(count) = piece_count.parse::<f32>() {
@@ -216,10 +217,11 @@ async fn main() {
                                     }
 
                                     // push retail price
+                                    println!("Set number: {:?}", set_data.set_number.last());
                                     let retail_price = document.select(&RETAIL_PRICE_SELECTOR);
-                                    for price in retail_price {
-                                        let headers = price.select(&COL_XS_5);
-                                        let mut items = price.select(&COL_XS_7);
+                                    for row in retail_price {
+                                        let headers = row.select(&COL_XS_5);
+                                        let mut items = row.select(&COL_XS_7);
 
                                         for header in headers {
                                             let header_html = header.inner_html();
@@ -227,10 +229,14 @@ async fn main() {
                                             if header_html.as_str() == "Retail price" {
                                                 if let Some(price) = item {
                                                     let price = price.inner_html();
-                                                    let price =
-                                                        RE_DOLLARS.captures(&price).unwrap();
-                                                    if let Ok(price) = price[1].parse::<f32>() {
-                                                        set_data.retail_price.push(Some(price));
+                                                    let price = RE_DOLLARS.captures(&price);
+                                                    if price.is_none() {
+                                                        set_data.retail_price.push(None);
+                                                    } else {
+                                                        let price = price.unwrap();
+                                                        if let Ok(price) = price[1].parse::<f32>() {
+                                                            set_data.retail_price.push(Some(price));
+                                                        }
                                                     }
                                                 } else {
                                                     set_data.retail_price.push(None);
@@ -244,8 +250,8 @@ async fn main() {
                                             let value_selector =
                                                 Selector::parse("span.helppopover").unwrap();
                                             let value_headers = header.select(&value_selector);
-                                            for value_header in value_headers {
-                                                let value_header = value_header.inner_html();
+                                            for header in value_headers {
+                                                let value_header = header.inner_html();
                                                 if value_header.as_str() == "Value"
                                                     || value_header.as_str() == "Market price"
                                                 {
@@ -261,10 +267,28 @@ async fn main() {
                                                     } else {
                                                         set_data.value.push(None);
                                                     }
+
+                                                    // TODO: fix this for 10097 - 10399
+                                                    // might need to go deeper
+                                                    if set_data.value.len() < set_data.name.len() {
+                                                        let b_selector = Selector::parse("b").unwrap();
+                                                        let values = item.unwrap().select(&b_selector);
+                                                        for value in values {
+                                                            let value = value.inner_html();
+                                                            let value =
+                                                                RE_DOLLARS.captures(&value).unwrap();
+                                                            if let Ok(value) = value[1].parse::<f32>() {
+                                                                set_data.value.push(Some(value));
+                                                            } else {
+                                                                set_data.value.push(None);
+                                                            }
+                                                        }
+                                                    }
                                                 }
                                             }
                                         }
                                     }
+                                    println!("value: {:?}, value len: {:?}", set_data.value.last(), set_data.value.len());
                                 }
                             }
                         }
@@ -354,7 +378,7 @@ async fn main() {
         // TODO: I would like to not be repeating myself here
         // TODO: make discount by % / piece
         .with_column(
-            ((col("listed_price") - col("value")) / col("value"))
+            ((col("listed_price") - col("value")) / (col("value") * col("pieces")))
                 .alias("percent_discount_from_value_per_piece"),
         )
         .sort("percent_discount_from_value_per_piece", Default::default());
