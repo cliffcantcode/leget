@@ -205,8 +205,6 @@ async fn main() {
 
                                 // push other items only once per valid set number
                                 if header.as_str() == "Set number" {
-                                    println!("Set number: {:?}", set_data.set_number.last());
-
                                     // push listed price
                                     let mut listed_price = document.select(&TABLE_TR_TD_DIV_SPAN_A);
                                     if let Some(price) = listed_price.next() {
@@ -239,6 +237,13 @@ async fn main() {
                                                 header_html = header.inner_html();
                                             }
 
+                                            println!(
+                                                "Header: {}\nItem: {}\nValue header count: {}",
+                                                &header_html,
+                                                item.unwrap().inner_html(),
+                                                &value_header_count
+                                            );
+
                                             match header_html.as_str() {
                                                 "Retail price" => {
                                                     if let Some(price) = item {
@@ -265,6 +270,10 @@ async fn main() {
                                                     // sometimes there are both new and used
                                                     // values; new seems to be first
                                                     value_header_count += 1;
+                                                    println!(
+                                                        "Value header count: {}",
+                                                        &value_header_count
+                                                    );
                                                     if value_header_count == 1 {
                                                         if let Some(price) = item {
                                                             // not using inner html since sometimes
@@ -287,19 +296,8 @@ async fn main() {
                                                 }
                                                 _ => {}
                                             }
-
-                                            println!(
-                                                "VS header: {:?} | item: {:?}",
-                                                &header.html(),
-                                                &item.unwrap().html()
-                                            );
                                         }
                                     }
-                                    println!(
-                                        "value: {:?}, value len: {:?}",
-                                        set_data.value.last(),
-                                        set_data.value.len()
-                                    );
                                 }
                             }
                         }
@@ -309,6 +307,13 @@ async fn main() {
                     panic!("There was a problem: {:?}", problem);
                 }
             }
+            // need to catch if the html is being missed somewhere
+            assert_eq!(
+                &set_data.set_number.len(),
+                &set_data.value.len(),
+                "Set number and value columns aren't the same length after set #{:?}.",
+                set_data.set_number.last().unwrap()
+            );
         }
     }
 
@@ -345,25 +350,24 @@ async fn main() {
     assert_eq!(
         &set_data.set_number.len(),
         &set_data.retail_price.len(),
-        "Name and retail price columns aren't the same length."
+        "Set number and retail price columns aren't the same length."
     );
     assert_eq!(
         &set_data.set_number.len(),
         &set_data.value.len(),
-        "Name and value columns aren't the same length."
+        "Set number and value columns aren't the same length."
     );
     assert_eq!(
         &set_data.set_number.len(),
         &set_data.listed_price.len(),
-        "Name and listed price columns aren't the same length."
+        "Set number and listed price columns aren't the same length."
     );
     assert_eq!(
         &set_data.set_number.len(),
         &set_data.pieces.len(),
-        "Name and pieces columns aren't the same length."
+        "Set number and pieces columns aren't the same length."
     );
 
-    // TODO: A lot of these floats need to be rounded due to precision issue
     let s_set_number = Series::new("set_number", &set_data.set_number);
     let s_name = Series::new("name", &set_data.name);
     let s_retail_price = Series::new("retail_price", &set_data.retail_price);
@@ -387,12 +391,11 @@ async fn main() {
                 .alias("percent_discount_from_value"),
         )
         // TODO: I would like to not be repeating myself here
-        // TODO: make discount by % / piece
         .with_column(
             ((col("listed_price") - col("value")) / (col("value") * col("pieces")))
                 .alias("percent_discount_from_value_per_piece"),
         )
         .sort("percent_discount_from_value_per_piece", Default::default());
     let lf = lf.collect().unwrap();
-    println!("{:?}", lf);
+    println!("{:?}\n {} Rows", lf, set_data.set_number.len());
 }
