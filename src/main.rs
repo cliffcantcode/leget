@@ -228,28 +228,23 @@ async fn main() {
                                         let mut items = row.select(&COL_XS_7);
 
                                         for header in headers {
-                                            let header_html = header.inner_html();
+                                            let mut header_html = header.inner_html();
                                             let item = items.next();
 
-                                            println!(
-                                                "Value header number: {:?}",
-                                                &value_header_count
-                                            );
-                                            println!(
-                                                "header: {:?} | item: {:?}",
-                                                &header.html(),
-                                                &item.unwrap().html()
-                                            );
+                                            // some headers are further nested
+                                            let value_selector =
+                                                Selector::parse("span.helppopover").unwrap();
+                                            let value_headers = header.select(&value_selector);
+                                            for header in value_headers {
+                                                header_html = header.inner_html();
+                                            }
 
                                             match header_html.as_str() {
                                                 "Retail price" => {
                                                     if let Some(price) = item {
                                                         let price = price.inner_html();
                                                         let price = RE_DOLLARS.captures(&price);
-                                                        if price.is_none() {
-                                                            set_data.retail_price.push(None);
-                                                        } else {
-                                                            let price = price.unwrap();
+                                                        if let Some(price) = price {
                                                             if let Ok(price) =
                                                                 price[1].parse::<f32>()
                                                             {
@@ -257,6 +252,8 @@ async fn main() {
                                                                     .retail_price
                                                                     .push(Some(price));
                                                             }
+                                                        } else {
+                                                            set_data.retail_price.push(None);
                                                         }
                                                     } else {
                                                         set_data.retail_price.push(None);
@@ -274,10 +271,7 @@ async fn main() {
                                                             // there is an additional <b> nested
                                                             let price = price.html();
                                                             let price = RE_DOLLARS.captures(&price);
-                                                            if price.is_none() {
-                                                                set_data.value.push(None);
-                                                            } else {
-                                                                let price = price.unwrap();
+                                                            if let Some(price) = price {
                                                                 if let Ok(price) =
                                                                     price[1].parse::<f32>()
                                                                 {
@@ -285,37 +279,20 @@ async fn main() {
                                                                         .value
                                                                         .push(Some(price));
                                                                 }
+                                                            } else {
+                                                                set_data.value.push(None);
                                                             }
                                                         }
                                                     }
                                                 }
-                                                _ => continue,
+                                                _ => {}
                                             }
 
-                                            // some headers are further nested
-                                            let value_selector =
-                                                Selector::parse("span.helppopover").unwrap();
-                                            let value_headers = header.select(&value_selector);
-                                            for header in value_headers {
-                                                let value_header = header.inner_html();
-                                                if value_header.as_str() == "Value"
-                                                    || value_header.as_str() == "Market price"
-                                                {
-                                                    value_header_count += 1;
-                                                    if let Some(value) = item {
-                                                        let value = value.inner_html();
-                                                        let value =
-                                                            RE_DOLLARS.captures(&value).unwrap();
-                                                        if let Ok(value) = value[1].parse::<f32>() {
-                                                            set_data.value.push(Some(value));
-                                                        } else {
-                                                            set_data.value.push(None);
-                                                        }
-                                                    } else {
-                                                        set_data.value.push(None);
-                                                    }
-                                                }
-                                            }
+                                            println!(
+                                                "VS header: {:?} | item: {:?}",
+                                                &header.html(),
+                                                &item.unwrap().html()
+                                            );
                                         }
                                     }
                                     println!(
