@@ -33,7 +33,8 @@ lazy_static! {
     // create regular expressions
     // if there is no ',' then the regex fails to find a second "set" of digits
     static ref RE_NUMBER_THEN_AMPERSAND: Regex = Regex::new(r"(\d+,?\d?+)&?").unwrap();
-    static ref RE_DOLLARS: Regex = Regex::new(r"\$(\d+,?\d?+\.?\d?+)").unwrap();
+    //static ref RE_DOLLARS: Regex = Regex::new(r"\$(\d?+,?\d?+\.\d?+)").unwrap();
+    static ref RE_DOLLARS: Regex = Regex::new(r"\$([0-9]?+,?[0-9]+.[0-9]+)").unwrap();
 }
 
 #[derive(Parser)]
@@ -237,13 +238,6 @@ async fn main() {
                                                 header_html = header.inner_html();
                                             }
 
-                                            println!(
-                                                "Header: {}\nItem: {}\nValue header count: {}",
-                                                &header_html,
-                                                item.unwrap().inner_html(),
-                                                &value_header_count
-                                            );
-
                                             match header_html.as_str() {
                                                 "Retail price" => {
                                                     if let Some(price) = item {
@@ -270,10 +264,6 @@ async fn main() {
                                                     // sometimes there are both new and used
                                                     // values; new seems to be first
                                                     value_header_count += 1;
-                                                    println!(
-                                                        "Value header count: {}",
-                                                        &value_header_count
-                                                    );
                                                     if value_header_count == 1 {
                                                         if let Some(price) = item {
                                                             // not using inner html since sometimes
@@ -281,8 +271,14 @@ async fn main() {
                                                             let price = price.html();
                                                             let price = RE_DOLLARS.captures(&price);
                                                             if let Some(price) = price {
+                                                                // regex doesn't handle ',' from
+                                                                // numbers that get into the
+                                                                // thousands
+                                                                let price = price[1]
+                                                                    .split(',')
+                                                                    .collect::<String>();
                                                                 if let Ok(price) =
-                                                                    price[1].parse::<f32>()
+                                                                    price.parse::<f32>()
                                                                 {
                                                                     set_data
                                                                         .value
