@@ -6,6 +6,8 @@ use lazy_static::lazy_static;
 use polars::prelude::*;
 use regex::Regex;
 use scraper::{Html, Selector};
+use std::fs::File;
+use std::io::Write;
 
 const MIN_YEAR_BRICK_ECONOMY: u16 = 1949;
 
@@ -382,6 +384,9 @@ async fn main() {
 
     let lf: LazyFrame = df.unwrap().lazy();
     let lf = lf
+        .filter(col("listed_price").is_not_null())
+        .filter(col("value").is_not_null())
+        .filter(col("pieces").gt(1))
         .with_column(
             ((col("listed_price") - col("value")) / col("value"))
                 .alias("percent_discount_from_value"),
@@ -394,4 +399,7 @@ async fn main() {
         .sort("percent_discount_from_value_per_piece", Default::default());
     let lf = lf.collect().unwrap();
     println!("{:?}\n {} Rows", lf, set_data.set_number.len());
+
+    let mut file = File::create("outputs/temp.txt").unwrap();
+    file.write_all(b"Screw you, world!").unwrap();
 }
