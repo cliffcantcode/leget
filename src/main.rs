@@ -7,13 +7,12 @@ use polars::prelude::*;
 use regex::Regex;
 use scraper::{Html, Selector};
 use std::fs::File;
-use std::io::Write;
 
 const MIN_YEAR_BRICK_ECONOMY: u16 = 1949;
 
 // Convience function to avoid unwrap()ing all the time
 fn make_selector(selector: &str) -> Selector {
-    Selector::parse(selector).unwrap()
+    Selector::parse(selector).expect("A Selector from the parsed &str.")
 }
 
 lazy_static! {
@@ -34,24 +33,26 @@ lazy_static! {
 
     // create regular expressions
     // if there is no ',' then the regex fails to find a second "set" of digits
-    static ref RE_NUMBER_THEN_AMPERSAND: Regex = Regex::new(r"(\d+,?\d?+)&?").unwrap();
-    //static ref RE_DOLLARS: Regex = Regex::new(r"\$(\d?+,?\d?+\.\d?+)").unwrap();
-    static ref RE_DOLLARS: Regex = Regex::new(r"\$([0-9]?+,?[0-9]+.[0-9]+)").unwrap();
+    static ref RE_NUMBER_THEN_AMPERSAND: Regex = Regex::new(r"(\d+,?\d?+)&?").expect("A Regex of a number before an '&'.");
+    static ref RE_DOLLARS: Regex = Regex::new(r"\$(\d?+,?\d?+\.\d?+)").expect("A Regex of a dollar amount after the '$'.");
+    // I think I can delete this: static ref RE_DOLLARS: Regex = Regex::new(r"\$([0-9]?+,?[0-9]+.[0-9]+)").unwrap();
 }
 
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
 struct Cli {
     // try to limit inputs to just valid years
+    /// the year made of sets you want to scan for. e.g. 2020 2021 2022 etc.
     #[arg(value_parser = clap::value_parser!(u16).range(1949..2200))]
     #[arg(short, long, group="year", num_args=1..100)]
     years: Option<Vec<u16>>,
 
-    // use full range of years from 1949 (oldest on brickeconomy)
+    /// scan full range of years from 1949 (oldest on brickeconomy)
     #[arg(long, group = "year")]
     all_years: bool,
 
-    // scrape by set number
+    // TODO: assert somewhere that the second must be > than the first
+    /// scrape by set number. you must give a range
     #[arg(short, long, num_args = 2)]
     set_number_range: Option<Vec<u32>>,
 }
@@ -119,7 +120,7 @@ impl Query {
 
 fn current_year() -> u16 {
     let date = Utc::today();
-    date.year().try_into().unwrap()
+    date.year().try_into().expect("A u16 of the current year.")
 }
 
 #[tokio::main]
@@ -166,6 +167,17 @@ async fn main() {
                     let document = Html::parse_document(&content);
 
                     let set_details = document.select(&SET_DETAILS);
+
+                    // sometimes the header isn't even there, not sure if forcing it is the best
+                    if set_data.set_number.len() > set_data.pieces.len() {
+                        set_data.pieces.push(None);
+                    }
+                    assert_eq!(
+                        &set_data.set_number.len(),
+                        &set_data.pieces.len(),
+                        "Set number and pieces columns aren't the same length after set #{:?}.",
+                        set_data.set_number.last().unwrap()
+                    );
 
                     // push one item at a time incase there are multiple
                     // push set number (as a string because of the '-')
@@ -386,6 +398,7 @@ async fn main() {
     let lf = lf
         .filter(col("listed_price").is_not_null())
         .filter(col("value").is_not_null())
+        // greater than covers nulls
         .filter(col("pieces").gt(1))
         .with_column(
             ((col("listed_price") - col("value")) / col("value"))
@@ -397,9 +410,10 @@ async fn main() {
                 .alias("percent_discount_from_value_per_piece"),
         )
         .sort("percent_discount_from_value_per_piece", Default::default());
-    let lf = lf.collect().unwrap();
+    let mut lf = lf.collect().unwrap();
     println!("{:?}\n {} Rows", lf, set_data.set_number.len());
 
-    let mut file = File::create("outputs/temp.txt").unwrap();
-    file.write_all(b"Screw you, world!").unwrap();
+    let legot_csv = File::create("outputs/legot.csv").unwrap();
+    let mut writer: CsvWriter<File> = CsvWriter::new(legot_csv).has_header(true);
+    writer.finish(&mut lf).unwrap();
 }

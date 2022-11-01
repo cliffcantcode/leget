@@ -1,2 +1,6 @@
 # Generated files
 /target/
+outputs/
+
+# most CSVs are data that shouldn't be pushed
+*.csv
