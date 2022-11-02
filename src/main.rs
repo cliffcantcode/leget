@@ -139,7 +139,10 @@ async fn main() {
     }
 
     if query.years.is_some() {
-        println!("{:?}", query.years.as_ref().expect("A reference to query.years"));
+        println!(
+            "{:?}",
+            query.years.as_ref().expect("A reference to query.years")
+        );
     }
 
     if let Some(set_numbers) = cli.set_number_range {
@@ -163,7 +166,10 @@ async fn main() {
 
             match response.status() {
                 reqwest::StatusCode::OK => {
-                    let content = response.text().await.expect("The text of the get response.");
+                    let content = response
+                        .text()
+                        .await
+                        .expect("The text of the get response.");
                     let document = Html::parse_document(&content);
 
                     let set_details = document.select(&SET_DETAILS);
@@ -176,7 +182,10 @@ async fn main() {
                         &set_data.set_number.len(),
                         &set_data.pieces.len(),
                         "Set number and pieces columns aren't the same length after set #{:?}.",
-                        set_data.set_number.last().expect("The last value of set_data.set_number.")
+                        set_data
+                            .set_number
+                            .last()
+                            .expect("The last value of set_data.set_number.")
                     );
 
                     // push one item at a time incase there are multiple
@@ -192,11 +201,17 @@ async fn main() {
                             if let Some(header) = header.next() {
                                 let header = header.inner_html();
                                 match header.as_str() {
-                                    "Set number" => {
-                                        set_data.set_number.push(item.next().expect("The next item from set details.").inner_html())
-                                    }
+                                    "Set number" => set_data.set_number.push(
+                                        item.next()
+                                            .expect("The next item from set details.")
+                                            .inner_html(),
+                                    ),
                                     "Name" => {
-                                        set_data.name.push(item.next().expect("The next item from set details.").inner_html());
+                                        set_data.name.push(
+                                            item.next()
+                                                .expect("The next item from set details.")
+                                                .inner_html(),
+                                        );
                                     }
                                     "Pieces" => {
                                         if let Some(pieces) = item.next() {
@@ -224,7 +239,9 @@ async fn main() {
                                     let mut listed_price = document.select(&TABLE_TR_TD_DIV_SPAN_A);
                                     if let Some(price) = listed_price.next() {
                                         let price = price.inner_html();
-                                        let price = RE_DOLLARS.captures(&price).expect("The matches of a regex with a number after a '$'.");
+                                        let price = RE_DOLLARS.captures(&price).expect(
+                                            "The matches of a regex with a number after a '$'.",
+                                        );
                                         if let Ok(price) = price[1].parse::<f32>() {
                                             set_data.listed_price.push(Some(price));
                                         } else {
@@ -322,7 +339,10 @@ async fn main() {
                 &set_data.set_number.len(),
                 &set_data.value.len(),
                 "Set number and value columns aren't the same length after set #{:?}.",
-                set_data.set_number.last().expect("The last value in set_data.set_number.")
+                set_data
+                    .set_number
+                    .last()
+                    .expect("The last value in set_data.set_number.")
             );
         }
     }
@@ -338,7 +358,10 @@ async fn main() {
 
         match response.status() {
             reqwest::StatusCode::OK => {
-                let content = response.text().await.expect("The text response of the year's get request.");
+                let content = response
+                    .text()
+                    .await
+                    .expect("The text response of the year's get request.");
                 let document = Html::parse_document(&content);
                 let h4 = document.select(&H4_A);
                 for item in h4 {
@@ -413,7 +436,10 @@ async fn main() {
     let mut lf = lf.collect().expect("An executed LazyFrame.");
     println!("{:?}\n {} Rows", lf, set_data.set_number.len());
 
-    let legot_csv = File::create("outputs/legot.csv").expect("The creation of the legot.csv in leget/outputs/");
+    let legot_csv =
+        File::create("outputs/legot.csv").expect("The creation of the legot.csv in leget/outputs/");
     let mut writer: CsvWriter<File> = CsvWriter::new(legot_csv).has_header(true);
-    writer.finish(&mut lf).expect("The writting of our data to outputs/legot.csv");
+    writer
+        .finish(&mut lf)
+        .expect("The writting of our data to outputs/legot.csv");
 }
