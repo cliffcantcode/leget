@@ -1,4 +1,6 @@
 mod scraper_utils;
+use scraper_utils::{make_selector, throttle};
+
 use chrono::offset::Utc;
 use chrono::Datelike;
 use clap::Parser;
@@ -9,11 +11,6 @@ use scraper::{Html, Selector};
 use std::fs::File;
 
 const MIN_YEAR_BRICK_ECONOMY: u16 = 1949;
-
-// Convience function to avoid unwrap()ing all the time
-fn make_selector(selector: &str) -> Selector {
-    Selector::parse(selector).expect("A Selector from the parsed &str.")
-}
 
 lazy_static! {
     // create selectors
@@ -30,12 +27,13 @@ lazy_static! {
     static ref TABLE_TR_TD_DIV_SPAN_A: Selector = make_selector("table#sales_region_table tr td div span.a");
     // it literally says 'placeholder' so this might break
     static ref PRICE_ROWS_SELECTOR: Selector = make_selector("#ContentPlaceHolder1_PanelSetPricing div.row");
+    // value is nested under a hover
+    static ref SPAN_HELPPOPOVER: Selector = make_selector("span.helppopover");
 
     // create regular expressions
     // if there is no ',' then the regex fails to find a second "set" of digits
     static ref RE_NUMBER_THEN_AMPERSAND: Regex = Regex::new(r"(\d+,?\d?+)&?").expect("A Regex of a number before an '&'.");
     static ref RE_DOLLARS: Regex = Regex::new(r"\$(\d?+,?\d?+\.\d?+)").expect("A Regex of a dollar amount after the '$'.");
-    // I think I can delete this: static ref RE_DOLLARS: Regex = Regex::new(r"\$([0-9]?+,?[0-9]+.[0-9]+)").unwrap();
 }
 
 #[derive(Parser)]
@@ -161,7 +159,7 @@ async fn main() {
             );
 
             // TODO: is there a way to get this to play nice with async?
-            scraper_utils::throttle();
+            throttle();
             let response = client.get(url).send().await.expect("An async get request.");
 
             match response.status() {
@@ -262,9 +260,7 @@ async fn main() {
                                             let item = items.next();
 
                                             // some headers are further nested
-                                            let value_selector =
-                                                Selector::parse("span.helppopover").expect("A Selector for a span tag with class \"helppopover\".");
-                                            let value_headers = header.select(&value_selector);
+                                            let value_headers = header.select(&SPAN_HELPPOPOVER);
                                             for header in value_headers {
                                                 header_html = header.inner_html();
                                             }
@@ -436,6 +432,7 @@ async fn main() {
     let mut lf = lf.collect().expect("An executed LazyFrame.");
     println!("{:?}\n {} Rows", lf, set_data.set_number.len());
 
+    // TODO: this breaks if there is not outputs dir you dummy
     let legot_csv =
         File::create("outputs/legot.csv").expect("The creation of the legot.csv in leget/outputs/");
     let mut writer: CsvWriter<File> = CsvWriter::new(legot_csv).has_header(true);

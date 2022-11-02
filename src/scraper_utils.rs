@@ -1,3 +1,4 @@
+use scraper::Selector;
 use std::sync::Mutex;
 use std::time::Instant;
 
@@ -6,6 +7,11 @@ use lazy_static::lazy_static;
 lazy_static! {
     static ref LAST_REQUEST_MUTEX: Mutex<Option<Instant>> = Mutex::new(None);
     static ref REQUEST_DELAY: std::time::Duration = std::time::Duration::from_millis(250);
+}
+
+// Convience function to avoid unwrap()ing all the time
+pub fn make_selector(selector: &str) -> Selector {
+    Selector::parse(selector).expect("A Selector from the parsed &str.")
 }
 
 // Add a minimum time delay so as not to overload the server
