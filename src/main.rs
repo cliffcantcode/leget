@@ -139,7 +139,7 @@ async fn main() {
     }
 
     if query.years.is_some() {
-        println!("{:?}", query.years.as_ref().unwrap());
+        println!("{:?}", query.years.as_ref().expect("A reference to query.years"));
     }
 
     if let Some(set_numbers) = cli.set_number_range {
@@ -159,11 +159,11 @@ async fn main() {
 
             // TODO: is there a way to get this to play nice with async?
             scraper_utils::throttle();
-            let response = client.get(url).send().await.unwrap();
+            let response = client.get(url).send().await.expect("An async get request.");
 
             match response.status() {
                 reqwest::StatusCode::OK => {
-                    let content = response.text().await.unwrap();
+                    let content = response.text().await.expect("The text of the get response.");
                     let document = Html::parse_document(&content);
 
                     let set_details = document.select(&SET_DETAILS);
@@ -176,7 +176,7 @@ async fn main() {
                         &set_data.set_number.len(),
                         &set_data.pieces.len(),
                         "Set number and pieces columns aren't the same length after set #{:?}.",
-                        set_data.set_number.last().unwrap()
+                        set_data.set_number.last().expect("The last value of set_data.set_number.")
                     );
 
                     // push one item at a time incase there are multiple
@@ -193,17 +193,17 @@ async fn main() {
                                 let header = header.inner_html();
                                 match header.as_str() {
                                     "Set number" => {
-                                        set_data.set_number.push(item.next().unwrap().inner_html())
+                                        set_data.set_number.push(item.next().expect("The next item from set details.").inner_html())
                                     }
                                     "Name" => {
-                                        set_data.name.push(item.next().unwrap().inner_html());
+                                        set_data.name.push(item.next().expect("The next item from set details.").inner_html());
                                     }
                                     "Pieces" => {
                                         if let Some(pieces) = item.next() {
                                             let piece_count = pieces.inner_html();
                                             let numbers =
                                                 RE_NUMBER_THEN_AMPERSAND.captures(&piece_count);
-                                            let numbers = numbers.unwrap();
+                                            let numbers = numbers.expect("The matches of a regex with a number before an '&'.");
                                             let piece_count =
                                                 numbers[1].split(',').collect::<String>();
                                             if let Ok(count) = piece_count.parse::<f32>() {
@@ -224,7 +224,7 @@ async fn main() {
                                     let mut listed_price = document.select(&TABLE_TR_TD_DIV_SPAN_A);
                                     if let Some(price) = listed_price.next() {
                                         let price = price.inner_html();
-                                        let price = RE_DOLLARS.captures(&price).unwrap();
+                                        let price = RE_DOLLARS.captures(&price).expect("The matches of a regex with a number after a '$'.");
                                         if let Ok(price) = price[1].parse::<f32>() {
                                             set_data.listed_price.push(Some(price));
                                         } else {
@@ -246,7 +246,7 @@ async fn main() {
 
                                             // some headers are further nested
                                             let value_selector =
-                                                Selector::parse("span.helppopover").unwrap();
+                                                Selector::parse("span.helppopover").expect("A Selector for a span tag with class \"helppopover\".");
                                             let value_headers = header.select(&value_selector);
                                             for header in value_headers {
                                                 header_html = header.inner_html();
@@ -322,7 +322,7 @@ async fn main() {
                 &set_data.set_number.len(),
                 &set_data.value.len(),
                 "Set number and value columns aren't the same length after set #{:?}.",
-                set_data.set_number.last().unwrap()
+                set_data.set_number.last().expect("The last value in set_data.set_number.")
             );
         }
     }
@@ -334,11 +334,11 @@ async fn main() {
             year = years_vec[0]
         );
 
-        let response = client.get(url).send().await.unwrap();
+        let response = client.get(url).send().await.expect("An async get request.");
 
         match response.status() {
             reqwest::StatusCode::OK => {
-                let content = response.text().await.unwrap();
+                let content = response.text().await.expect("The text response of the year's get request.");
                 let document = Html::parse_document(&content);
                 let h4 = document.select(&H4_A);
                 for item in h4 {
@@ -355,7 +355,7 @@ async fn main() {
     assert_eq!(
         &set_data.set_number.len(),
         &set_data.name.len(),
-        "Set number and name  columns aren't the same length."
+        "Set number and name columns aren't the same length."
     );
     assert_eq!(
         &set_data.set_number.len(),
@@ -394,7 +394,7 @@ async fn main() {
         s_pieces,
     ]);
 
-    let lf: LazyFrame = df.unwrap().lazy();
+    let lf: LazyFrame = df.expect("A Polars DataFrame.").lazy();
     let lf = lf
         .filter(col("listed_price").is_not_null())
         .filter(col("value").is_not_null())
@@ -410,10 +410,10 @@ async fn main() {
                 .alias("percent_discount_from_value_per_piece"),
         )
         .sort("percent_discount_from_value_per_piece", Default::default());
-    let mut lf = lf.collect().unwrap();
+    let mut lf = lf.collect().expect("An executed LazyFrame.");
     println!("{:?}\n {} Rows", lf, set_data.set_number.len());
 
-    let legot_csv = File::create("outputs/legot.csv").unwrap();
+    let legot_csv = File::create("outputs/legot.csv").expect("The creation of the legot.csv in leget/outputs/");
     let mut writer: CsvWriter<File> = CsvWriter::new(legot_csv).has_header(true);
-    writer.finish(&mut lf).unwrap();
+    writer.finish(&mut lf).expect("The writting of our data to outputs/legot.csv");
 }
