@@ -2,9 +2,8 @@
 
 use crate::scraper_utils::{make_selector, throttle};
 use crate::set_data::SetData;
+use crate::query::Query;
 
-use chrono::offset::Utc;
-use chrono::Datelike;
 use clap::Parser;
 use lazy_static::lazy_static;
 use polars::prelude::*;
@@ -12,7 +11,6 @@ use regex::Regex;
 use scraper::{Html, Selector};
 use std::fs::File;
 
-const MIN_YEAR_BRICK_ECONOMY: u16 = 1949;
 
 lazy_static! {
     // create selectors
@@ -36,42 +34,6 @@ lazy_static! {
     // if there is no ',' then the regex fails to find a second "set" of digits
     static ref RE_NUMBER_THEN_AMPERSAND: Regex = Regex::new(r"(\d+,?\d?+)&?").expect("A Regex of a number before an '&'.");
     static ref RE_DOLLARS: Regex = Regex::new(r"\$(\d?+,?\d?+\.\d?+)").expect("A Regex of a dollar amount after the '$'.");
-}
-
-// until method for other impl methods
-fn current_year() -> u16 {
-    let date = Utc::today();
-    date.year().try_into().expect("A u16 of the current year.")
-}
-
-// the filters that will be applied to our data
-struct Query {
-    years: Option<Vec<u16>>,
-    set_number_range: Option<Vec<u32>>,
-}
-
-impl Query {
-    fn new() -> Self {
-        Query {
-            years: None,
-            set_number_range: None,
-        }
-    }
-
-    fn set_years(&mut self, years: Vec<u16>) {
-        let _ = self.years.take();
-        self.years = Some(years);
-    }
-
-    fn set_all_years(&mut self) {
-        let all_years: Vec<u16> = (MIN_YEAR_BRICK_ECONOMY..=current_year()).collect();
-        self.set_years(all_years);
-    }
-
-    fn set_set_number_range(&mut self, set_numbers: Vec<u32>) {
-        let _ = self.set_number_range.take();
-        self.set_number_range = Some(set_numbers);
-    }
 }
 
 #[derive(Parser)]
