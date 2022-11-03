@@ -33,6 +33,7 @@ lazy_static! {
     // if there is no ',' then the regex fails to find a second "set" of digits
     static ref RE_NUMBER_THEN_AMPERSAND: Regex = Regex::new(r"(\d+,?\d?+)&?").expect("A Regex of a number before an '&'.");
     static ref RE_DOLLARS: Regex = Regex::new(r"\$(\d?+,?\d?+\.\d?+)").expect("A Regex of a dollar amount after the '$'.");
+    static ref RE_YEAR: Regex = Regex::new(r"[\s>](\d{4})[<\s]").expect("A Regex for a 4 digit number.");
 }
 
 #[derive(Parser)]
@@ -143,12 +144,17 @@ impl Leget {
                                             );
                                         }
                                         "Year" => {
-                                            println!(
-                                                "Year: {}",
-                                                item.next()
-                                                    .expect("The next year from set details.")
-                                                    .inner_html()
-                                            );
+                                            if let Some(year) = item.next() {
+                                                let year = year.inner_html();
+                                                let numbers = RE_YEAR.captures(&year);
+                                                let numbers = numbers.expect(
+                                                    "The matches of a regex for 4 digit numbers.",
+                                                );
+                                                let year = &numbers[1];
+                                                set_data.year.push(Some(year.to_string()));
+                                            } else {
+                                                set_data.year.push(None);
+                                            }
                                         }
                                         "Pieces" => {
                                             if let Some(pieces) = item.next() {
@@ -320,6 +326,11 @@ impl Leget {
         );
         assert_eq!(
             &set_data.set_number.len(),
+            &set_data.year.len(),
+            "Set number and year columns aren't the same length."
+        );
+        assert_eq!(
+            &set_data.set_number.len(),
             &set_data.retail_price.len(),
             "Set number and retail price columns aren't the same length."
         );
@@ -341,6 +352,7 @@ impl Leget {
 
         let s_set_number = Series::new("set_number", &set_data.set_number);
         let s_name = Series::new("name", &set_data.name);
+        let s_year = Series::new("year", &set_data.year);
         let s_retail_price = Series::new("retail_price", &set_data.retail_price);
         let s_value = Series::new("value", &set_data.value);
         let s_listed_price = Series::new("listed_price", &set_data.listed_price);
@@ -349,6 +361,7 @@ impl Leget {
         let df: PolarsResult<DataFrame> = DataFrame::new(vec![
             s_set_number,
             s_name,
+            s_year,
             s_retail_price,
             s_value,
             s_listed_price,
