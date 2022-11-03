@@ -51,12 +51,17 @@ pub struct Leget {
 
     // TODO: assert somewhere that the second must be > than the first
     /// scrape by set number. you must give a range
-    #[arg(short, long, num_args = 2)]
+    #[arg(short, long, group = "set_range", num_args = 2)]
     set_number_range: Option<Vec<u32>>,
+
+    // TODO: this might want to be a subcommand
+    /// use this to update the file that lists valid sets
+    #[arg(short = 'S', long, group = "set_range", num_args = 2)]
+    scan_sets: Option<Vec<u32>>,
 }
 
 impl Leget {
-    pub async fn exec(self) -> color_eyre::Result<()> {
+    pub async fn exec(mut self) -> color_eyre::Result<()> {
         let mut query = Query::new();
         let mut set_data = SetData::new();
 
@@ -75,12 +80,22 @@ impl Leget {
             );
         }
 
-        if let Some(set_numbers) = self.set_number_range {
-            query.set_set_number_range(set_numbers);
+        // needs to be before we replace set_number_range with scan_sets
+        if let Some(ref set_numbers) = self.set_number_range {
+            query.set_set_number_range(set_numbers.to_vec());
         }
 
         // We can scrape the site once our query settings are ready
         let client = reqwest::Client::new();
+
+        // TODO: For some reason df is blank even after the set range swap
+        // if scan_sets is set we need to swap set range and create a flag
+        if let Some(range) = self.scan_sets {
+            println!("sets before: {:?}", &self.set_number_range);
+            let _ = self.set_number_range.take();
+            self.set_number_range = Some(range);
+        }
+        println!("sets after: {:?}", &self.set_number_range);
 
         // Scrape by set numbers
         if let Some(range) = query.set_number_range {
