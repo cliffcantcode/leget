@@ -433,10 +433,9 @@ async fn main() {
     println!("{:?}\n {} Rows", lf, set_data.set_number.len());
 
     // TODO: this breaks if there is not outputs dir you dummy
-    let legot_csv =
-        File::create("outputs/legot.csv").expect("The creation of the legot.csv in leget/outputs/");
+    let legot_csv = File::create("legot.csv").expect("The creation of the legot.csv");
     let mut writer: CsvWriter<File> = CsvWriter::new(legot_csv).has_header(true);
     writer
         .finish(&mut lf)
-        .expect("The writting of our data to outputs/legot.csv");
+        .expect("The writting of our data to legot.csv");
 }
