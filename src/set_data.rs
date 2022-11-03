@@ -5,6 +5,8 @@ pub struct SetData {
 
     pub name: Vec<String>,
 
+    pub year: Vec<Option<String>>,
+
     pub retail_price: Vec<Option<f32>>,
 
     // either market price or brickeconomy estimate
@@ -23,6 +25,7 @@ impl SetData {
         SetData {
             set_number: vec![],
             name: vec![],
+            year: vec![],
             retail_price: vec![],
             value: vec![],
             listed_price: vec![],

@@ -1,8 +1,8 @@
 //! Command line parsing and logic
 
+use crate::query::Query;
 use crate::scraper_utils::{make_selector, throttle};
 use crate::set_data::SetData;
-use crate::query::Query;
 
 use clap::Parser;
 use lazy_static::lazy_static;
@@ -10,7 +10,6 @@ use polars::prelude::*;
 use regex::Regex;
 use scraper::{Html, Selector};
 use std::fs::File;
-
 
 lazy_static! {
     // create selectors
@@ -25,7 +24,7 @@ lazy_static! {
     static ref TABLE_TR_TD_H1: Selector = make_selector("table tr td h1");
     // gets listed price
     static ref TABLE_TR_TD_DIV_SPAN_A: Selector = make_selector("table#sales_region_table tr td div span.a");
-    // it literally says 'placeholder' so this might break
+    // these literally says 'placeholder' so this might break
     static ref PRICE_ROWS_SELECTOR: Selector = make_selector("#ContentPlaceHolder1_PanelSetPricing div.row");
     // value is nested under a hover
     static ref SPAN_HELPPOPOVER: Selector = make_selector("span.helppopover");
@@ -133,14 +132,22 @@ impl Leget {
                                     match header.as_str() {
                                         "Set number" => set_data.set_number.push(
                                             item.next()
-                                                .expect("The next item from set details.")
+                                                .expect("The next set number from set details.")
                                                 .inner_html(),
                                         ),
                                         "Name" => {
                                             set_data.name.push(
                                                 item.next()
-                                                    .expect("The next item from set details.")
+                                                    .expect("The next name from set details.")
                                                     .inner_html(),
+                                            );
+                                        }
+                                        "Year" => {
+                                            println!(
+                                                "Year: {}",
+                                                item.next()
+                                                    .expect("The next year from set details.")
+                                                    .inner_html()
                                             );
                                         }
                                         "Pieces" => {

@@ -1,6 +1,6 @@
+use crate::MIN_YEAR_BRICK_ECONOMY;
 use chrono::offset::Utc;
 use chrono::Datelike;
-use crate::MIN_YEAR_BRICK_ECONOMY;
 
 // until method for other impl methods
 fn current_year() -> u16 {
@@ -37,4 +37,3 @@ impl Query {
         self.set_number_range = Some(set_numbers);
     }
 }
-

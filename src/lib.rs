@@ -2,9 +2,9 @@
 //! as well as other modules.
 
 mod command;
+mod query;
 mod scraper_utils;
 mod set_data;
-mod query;
 
 #[doc(hidden)]
 pub use command::Leget;
