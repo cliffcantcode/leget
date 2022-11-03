@@ -1,6 +1,7 @@
 //! Command line parsing and logic
 
 use crate::scraper_utils::{make_selector, throttle};
+use crate::set_data::SetData;
 
 use chrono::offset::Utc;
 use chrono::Datelike;
@@ -70,39 +71,6 @@ impl Query {
     fn set_set_number_range(&mut self, set_numbers: Vec<u32>) {
         let _ = self.set_number_range.take();
         self.set_number_range = Some(set_numbers);
-    }
-}
-
-// where the data we pull will be stored
-struct SetData {
-    // can't be a number because it's formatted with a '-'
-    set_number: Vec<String>,
-
-    name: Vec<String>,
-
-    retail_price: Vec<Option<f32>>,
-
-    // either market price or brickeconomy estimate
-    value: Vec<Option<f32>>,
-
-    // a seller's price; should be cheapest but not guaranteed
-    listed_price: Vec<Option<f32>>,
-
-    // u16 (65_535) since current largest set is only 11_695 pieces
-    // not u16 because polars::perlude::NamedFrom isn't impled for Vec<Option<u16>>?
-    pieces: Vec<Option<f32>>,
-}
-
-impl SetData {
-    fn new() -> Self {
-        SetData {
-            set_number: vec![],
-            name: vec![],
-            retail_price: vec![],
-            value: vec![],
-            listed_price: vec![],
-            pieces: vec![],
-        }
     }
 }
 

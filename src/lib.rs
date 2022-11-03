@@ -3,6 +3,7 @@
 
 mod command;
 mod scraper_utils;
+mod set_data;
 
 #[doc(hidden)]
 pub use command::Leget;
