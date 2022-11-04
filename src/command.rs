@@ -57,7 +57,7 @@ pub struct Leget {
     // TODO: this might want to be a subcommand
     /// use this to update the file that lists valid sets
     #[arg(short = 'S', long, group = "set_range", num_args = 2)]
-    scan_sets: Option<Vec<u32>>,
+    update_set_list: Option<Vec<u32>>,
 }
 
 impl Leget {
@@ -83,17 +83,17 @@ impl Leget {
             );
         }
 
-        // needs to be before we replace set_number_range with scan_sets
+        // needs to be before we replace set_number_range with update_set_list
         if let Some(ref range) = self.set_number_range {
             query.set_set_number_range(range.to_vec());
         }
 
-        // if scan_sets is set we need to swap set range and create a flag
-        let mut scan_sets_flag = false;
-        if let Some(ref range) = self.scan_sets {
+        // if update_set_list is set we need to swap set range and create a flag
+        let mut update_set_list_flag = false;
+        if let Some(ref range) = self.update_set_list {
             query.set_set_number_range(range.to_vec());
 
-            scan_sets_flag = true;
+            update_set_list_flag = true;
         }
 
         // Scrape by set numbers
@@ -118,6 +118,7 @@ impl Leget {
 
                         let set_details = document.select(&SET_DETAILS);
 
+                        // Catch all other edge cases so that the columns are the same len
                         // sometimes the header isn't even there, not sure if forcing it is the best
                         if set_data.set_number.len() > set_data.pieces.len() {
                             set_data.pieces.push(None);
@@ -126,6 +127,19 @@ impl Leget {
                             &set_data.set_number.len(),
                             &set_data.pieces.len(),
                             "Set number and pieces columns aren't the same length after set #{:?}.",
+                            set_data
+                                .set_number
+                                .last()
+                                .expect("The last value of set_data.set_number.")
+                        );
+                        // sometimes there just isn't a place to get the retail price
+                        if set_data.set_number.len() > set_data.retail_price.len() {
+                            set_data.retail_price.push(None);
+                        }
+                        assert_eq!(
+                            &set_data.set_number.len(),
+                            &set_data.retail_price.len(),
+                            "Set number and retail_price columns aren't the same length after set #{:?}.",
                             set_data
                                 .set_number
                                 .last()
@@ -373,7 +387,7 @@ impl Leget {
         let s_pieces = Series::new("pieces", &set_data.pieces);
 
         // do everything else, but control the output
-        if scan_sets_flag {
+        if update_set_list_flag {
             let mut df: DataFrame =
                 DataFrame::new(vec![s_set_number, s_year, s_pieces]).expect("A Polars DataFrame.");
 
@@ -389,34 +403,33 @@ impl Leget {
 
             // Read in stored list of sets
             // append doesn't work if dtypes are mismatched; defaults are mismatched on read of csv
-            let mut valid_sets_schema = Schema::new();
-            valid_sets_schema.with_column("set_number".to_string(), DataType::Utf8);
-            valid_sets_schema.with_column("year".to_string(), DataType::Utf8);
-            valid_sets_schema.with_column("pieces".to_string(), DataType::Float32);
+            let mut set_list_schema = Schema::new();
+            set_list_schema.with_column("set_number".to_string(), DataType::Utf8);
+            set_list_schema.with_column("year".to_string(), DataType::Utf8);
+            set_list_schema.with_column("pieces".to_string(), DataType::Float32);
 
-            let mut valid_sets_df: DataFrame = CsvReader::from_path("valid_sets.csv")
-                .expect("A reader connection to valid_sets.csv")
-                .with_dtypes(Some(&valid_sets_schema))
+            let mut set_list_df: DataFrame = CsvReader::from_path("set_list.csv")
+                .expect("A reader connection to set_list.csv")
+                .with_dtypes(Some(&set_list_schema))
                 .has_header(true)
                 .finish()
-                .expect("A polars DataFrame from valid_sets.csv");
+                .expect("A polars DataFrame from set_list.csv");
 
-            valid_sets_df
+            set_list_df
                 .extend(&df)
-                .expect("The scanned df appended to the valid_sets_df.");
-            valid_sets_df = valid_sets_df
+                .expect("The scanned df appended to the set_list_df.");
+            set_list_df = set_list_df
                 .unique(Some(&["set_number".to_string()]), UniqueKeepStrategy::First)
                 .expect("A DataFrame with no duplicate set numbers.")
                 .sort(["set_number"], false)
                 .expect("A asc sorted DataFrame by set number.");
-            println!("valid_sets_df: {}", &valid_sets_df);
+            println!("set_list_df: {}", &set_list_df);
 
-            let valid_sets =
-                File::create("valid_sets.csv").expect("The creation of the valid_sets.csv");
-            let mut writer: CsvWriter<File> = CsvWriter::new(valid_sets).has_header(true);
+            let set_list = File::create("set_list.csv").expect("The creation of the set_list.csv");
+            let mut writer: CsvWriter<File> = CsvWriter::new(set_list).has_header(true);
             writer
-                .finish(&mut valid_sets_df)
-                .expect("The writting of our data to valid_sets.csv");
+                .finish(&mut set_list_df)
+                .expect("The writting of our data to set_list.csv");
         } else {
             // TODO: DRY
             let df: PolarsResult<DataFrame> = DataFrame::new(vec![
