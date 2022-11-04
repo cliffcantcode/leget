@@ -374,9 +374,10 @@ impl Leget {
 
         // do everything else, but control the output
         if scan_sets_flag {
-            let df: PolarsResult<DataFrame> = DataFrame::new(vec![s_set_number, s_year, s_pieces]);
+            let df: DataFrame =
+                DataFrame::new(vec![s_set_number, s_year, s_pieces]).expect("A Polars DataFrame.");
 
-            let lf: LazyFrame = df.expect("A Polars DataFrame.").lazy();
+            let lf: LazyFrame = df.clone().lazy();
             let lf = lf
                 // greater than covers nulls
                 .filter(col("pieces").gt(1));
@@ -386,12 +387,22 @@ impl Leget {
                 .expect("An executed LazyFrame for scanned sets.");
             println!("{}", &lf);
 
-            let df: DataFrame = CsvReader::from_path("valid_sets.csv")
+            let mut valid_sets_schema = Schema::new();
+            valid_sets_schema.with_column("set_number".to_string(), DataType::Utf8);
+            valid_sets_schema.with_column("year".to_string(), DataType::Utf8);
+            valid_sets_schema.with_column("pieces".to_string(), DataType::Float32);
+
+            let mut valid_sets_df: DataFrame = CsvReader::from_path("valid_sets.csv")
                 .expect("A reader connection to valid_sets.csv")
+                .with_dtypes(Some(&valid_sets_schema))
                 .has_header(true)
                 .finish()
                 .expect("A polars DataFrame from valid_sets.csv");
-            println!("{}", &df);
+
+            valid_sets_df
+                .extend(&df)
+                .expect("The scanned df appended to the valid_sets_df.");
+            println!("valid_sets_df: {}", &valid_sets_df);
 
             let valid_sets =
                 File::create("valid_sets.csv").expect("The creation of the valid_sets.csv");
