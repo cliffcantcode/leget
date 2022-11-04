@@ -61,9 +61,12 @@ pub struct Leget {
 }
 
 impl Leget {
-    pub async fn exec(mut self) -> color_eyre::Result<()> {
+    pub async fn exec(self) -> color_eyre::Result<()> {
         let mut query = Query::new();
         let mut set_data = SetData::new();
+
+        // We can scrape the site once our query settings are ready
+        let client = reqwest::Client::new();
 
         if self.all_years {
             query.set_all_years();
@@ -81,21 +84,17 @@ impl Leget {
         }
 
         // needs to be before we replace set_number_range with scan_sets
-        if let Some(ref set_numbers) = self.set_number_range {
-            query.set_set_number_range(set_numbers.to_vec());
+        if let Some(ref range) = self.set_number_range {
+            query.set_set_number_range(range.to_vec());
         }
 
-        // We can scrape the site once our query settings are ready
-        let client = reqwest::Client::new();
-
-        // TODO: For some reason df is blank even after the set range swap
         // if scan_sets is set we need to swap set range and create a flag
-        if let Some(range) = self.scan_sets {
-            println!("sets before: {:?}", &self.set_number_range);
-            let _ = self.set_number_range.take();
-            self.set_number_range = Some(range);
+        let mut scan_sets_flag = false;
+        if let Some(ref range) = self.scan_sets {
+            query.set_set_number_range(range.to_vec());
+
+            scan_sets_flag = true;
         }
-        println!("sets after: {:?}", &self.set_number_range);
 
         // Scrape by set numbers
         if let Some(range) = query.set_number_range {
@@ -373,41 +372,63 @@ impl Leget {
         let s_listed_price = Series::new("listed_price", &set_data.listed_price);
         let s_pieces = Series::new("pieces", &set_data.pieces);
 
-        let df: PolarsResult<DataFrame> = DataFrame::new(vec![
-            s_set_number,
-            s_name,
-            s_year,
-            s_retail_price,
-            s_value,
-            s_listed_price,
-            s_pieces,
-        ]);
+        // do everything else, but control the output
+        if scan_sets_flag {
+            let df: PolarsResult<DataFrame> = DataFrame::new(vec![s_set_number, s_year, s_pieces]);
 
-        let lf: LazyFrame = df.expect("A Polars DataFrame.").lazy();
-        let lf = lf
-            .filter(col("listed_price").is_not_null())
-            .filter(col("value").is_not_null())
-            // greater than covers nulls
-            .filter(col("pieces").gt(1))
-            .with_column(
-                ((col("listed_price") - col("value")) / col("value"))
-                    .alias("percent_discount_from_value"),
-            )
-            // TODO: I would like to not be repeating myself here
-            .with_column(
-                ((col("listed_price") - col("value")) / (col("value") * col("pieces")))
-                    .alias("percent_discount_from_value_per_piece"),
-            )
-            .sort("percent_discount_from_value_per_piece", Default::default());
-        let mut lf = lf.collect().expect("An executed LazyFrame.");
-        println!("{:?}\n {} Rows", lf, set_data.set_number.len());
+            let lf: LazyFrame = df.expect("A Polars DataFrame.").lazy();
+            let lf = lf
+                // greater than covers nulls
+                .filter(col("pieces").gt(1));
 
-        // TODO: this breaks if there is not outputs dir you dummy
-        let legot_csv = File::create("legot.csv").expect("The creation of the legot.csv");
-        let mut writer: CsvWriter<File> = CsvWriter::new(legot_csv).has_header(true);
-        writer
-            .finish(&mut lf)
-            .expect("The writting of our data to legot.csv");
+            let mut lf = lf
+                .collect()
+                .expect("An executed LazyFrame for scanned sets.");
+            println!("{}", &lf);
+
+            let valid_sets =
+                File::create("valid_sets.csv").expect("The creation of the valid_sets.csv");
+            let mut writer: CsvWriter<File> = CsvWriter::new(valid_sets).has_header(true);
+            writer
+                .finish(&mut lf)
+                .expect("The writting of our data to valid_sets.csv");
+        } else {
+            // TODO: DRY
+            let df: PolarsResult<DataFrame> = DataFrame::new(vec![
+                s_set_number,
+                s_name,
+                s_year,
+                s_retail_price,
+                s_value,
+                s_listed_price,
+                s_pieces,
+            ]);
+
+            let lf: LazyFrame = df.expect("A Polars DataFrame.").lazy();
+            let lf = lf
+                .filter(col("listed_price").is_not_null())
+                .filter(col("value").is_not_null())
+                // greater than covers nulls
+                .filter(col("pieces").gt(1))
+                .with_column(
+                    ((col("listed_price") - col("value")) / col("value"))
+                        .alias("percent_discount_from_value"),
+                )
+                // TODO: I would like to not be repeating myself here
+                .with_column(
+                    ((col("listed_price") - col("value")) / (col("value") * col("pieces")))
+                        .alias("percent_discount_from_value_per_piece"),
+                )
+                .sort("percent_discount_from_value_per_piece", Default::default());
+            let mut lf = lf.collect().expect("An executed LazyFrame.");
+            println!("{}", &lf);
+
+            let legot_csv = File::create("legot.csv").expect("The creation of the legot.csv");
+            let mut writer: CsvWriter<File> = CsvWriter::new(legot_csv).has_header(true);
+            writer
+                .finish(&mut lf)
+                .expect("The writting of our data to legot.csv");
+        }
 
         Ok(())
     }
