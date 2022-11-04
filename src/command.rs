@@ -49,6 +49,11 @@ pub struct Leget {
     #[arg(long, group = "year")]
     all_years: bool,
 
+    // TODO: default the reading of set_number_range from our csv
+    /// utilize the stored set_list.csv; should not be used in conjunction with --update-set-list
+    #[arg(long, default_value_t = true)]
+    use_set_list: bool,
+
     // TODO: assert somewhere that the second must be > than the first
     /// scrape by set number. you must give a range
     #[arg(short, long, group = "set_range", num_args = 2)]
