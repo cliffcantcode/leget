@@ -374,19 +374,21 @@ impl Leget {
 
         // do everything else, but control the output
         if scan_sets_flag {
-            let df: DataFrame =
+            let mut df: DataFrame =
                 DataFrame::new(vec![s_set_number, s_year, s_pieces]).expect("A Polars DataFrame.");
 
-            let lf: LazyFrame = df.clone().lazy();
-            let lf = lf
+            let mut lf: LazyFrame = df.clone().lazy();
+            lf = lf
                 // greater than covers nulls
                 .filter(col("pieces").gt(1));
 
-            let mut lf = lf
+            df = lf
                 .collect()
                 .expect("An executed LazyFrame for scanned sets.");
-            println!("{}", &lf);
+            println!("{}", &df);
 
+            // Read in stored list of sets
+            // append doesn't work if dtypes are mismatched; defaults are mismatched on read of csv
             let mut valid_sets_schema = Schema::new();
             valid_sets_schema.with_column("set_number".to_string(), DataType::Utf8);
             valid_sets_schema.with_column("year".to_string(), DataType::Utf8);
@@ -402,13 +404,18 @@ impl Leget {
             valid_sets_df
                 .extend(&df)
                 .expect("The scanned df appended to the valid_sets_df.");
+            valid_sets_df = valid_sets_df
+                .unique(Some(&["set_number".to_string()]), UniqueKeepStrategy::First)
+                .expect("A DataFrame with no duplicate set numbers.")
+                .sort(["set_number"], false)
+                .expect("A asc sorted DataFrame by set number.");
             println!("valid_sets_df: {}", &valid_sets_df);
 
             let valid_sets =
                 File::create("valid_sets.csv").expect("The creation of the valid_sets.csv");
             let mut writer: CsvWriter<File> = CsvWriter::new(valid_sets).has_header(true);
             writer
-                .finish(&mut lf)
+                .finish(&mut valid_sets_df)
                 .expect("The writting of our data to valid_sets.csv");
         } else {
             // TODO: DRY
