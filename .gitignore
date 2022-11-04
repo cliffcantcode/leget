@@ -3,3 +3,4 @@
 
 # most CSVs are data that shouldn't be pushed
 *.csv
+!valid_sets.csv # used to avoid sending requests to blank pages
