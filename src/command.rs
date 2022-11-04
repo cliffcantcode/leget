@@ -386,6 +386,13 @@ impl Leget {
                 .expect("An executed LazyFrame for scanned sets.");
             println!("{}", &lf);
 
+            let df: DataFrame = CsvReader::from_path("valid_sets.csv")
+                .expect("A reader connection to valid_sets.csv")
+                .has_header(true)
+                .finish()
+                .expect("A polars DataFrame from valid_sets.csv");
+            println!("{}", &df);
+
             let valid_sets =
                 File::create("valid_sets.csv").expect("The creation of the valid_sets.csv");
             let mut writer: CsvWriter<File> = CsvWriter::new(valid_sets).has_header(true);
