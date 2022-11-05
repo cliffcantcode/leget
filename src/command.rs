@@ -81,14 +81,6 @@ impl Leget {
         set_list_schema.with_column("year".to_string(), DataType::Utf8);
         set_list_schema.with_column("pieces".to_string(), DataType::Float32);
 
-        // read in the set list
-        let mut set_list_df: DataFrame = CsvReader::from_path("set_list.csv")
-            .expect("A reader connection to set_list.csv")
-            .with_dtypes(Some(&set_list_schema))
-            .has_header(true)
-            .finish()
-            .expect("A polars DataFrame from set_list.csv");
-
         if self.all_years {
             query.set_all_years();
         }
@@ -111,6 +103,22 @@ impl Leget {
 
         // swap values for set list before update_set_list so they aren't clashing
         if !self.skip_set_list {
+            // read in the set list
+            let set_list_df: DataFrame = CsvReader::from_path("set_list.csv")
+                .expect("A reader connection to set_list.csv")
+                .with_dtypes(Some(&set_list_schema))
+                .has_header(true)
+                .finish()
+                .expect("A polars DataFrame from set_list.csv");
+            if let Some(ref range) = query.set_number_range {
+                for set in range[0]..=range[1] {
+                    let mut set: String = set.to_string();
+                    set.push_str("-1");
+                    println!("set {}", set);
+                    // let mask = df.column("set_number").expect("Accessed the set_number column.").
+                    // set_list_df.filter(col("set_number").
+                }
+            }
             println!("using set list: {}", &set_list_df);
         }
 
@@ -118,7 +126,7 @@ impl Leget {
         let mut update_set_list_flag = false;
         if let Some(ref range) = self.update_set_list {
             // you shouldn't use the set list to update itself.
-            if self.skip_set_list == false {
+            if !self.skip_set_list {
                 println!("Overriding --skip-set-list=false. You should not use the set list to update itself.");
                 self.skip_set_list = true;
             }
