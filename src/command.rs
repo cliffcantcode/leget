@@ -102,24 +102,42 @@ impl Leget {
         }
 
         // swap values for set list before update_set_list so they aren't clashing
+        // TODO: the names here are super confusing
         if !self.skip_set_list {
             // read in the set list
-            let set_list_df: DataFrame = CsvReader::from_path("set_list.csv")
+            let set_list_lf: LazyFrame = CsvReader::from_path("set_list.csv")
                 .expect("A reader connection to set_list.csv")
                 .with_dtypes(Some(&set_list_schema))
                 .has_header(true)
                 .finish()
-                .expect("A polars DataFrame from set_list.csv");
+                .expect("A polars DataFrame from set_list.csv")
+                .lazy();
+
+            // gather set range into a vec so we can make a df
             if let Some(ref range) = query.set_number_range {
+                let mut filter_sets: Vec<String> = vec![];
                 for set in range[0]..=range[1] {
                     let mut set: String = set.to_string();
                     set.push_str("-1");
-                    println!("set {}", set);
-                    // let mask = df.column("set_number").expect("Accessed the set_number column.").
-                    // set_list_df.filter(col("set_number").
+                    filter_sets.push(set);
                 }
+
+                let filter_sets_lf: LazyFrame = df! {
+                    "sets_to_filter" => filter_sets,
+                }
+                .expect("A DataFrame of my sets to filter to.")
+                .lazy();
+
+                let joined_lf = set_list_lf.inner_join(
+                    filter_sets_lf,
+                    col("set_number"),
+                    col("sets_to_filter"),
+                );
+                println!(
+                    "joined DF: {:?}",
+                    joined_lf.collect().expect("The filtered df.")
+                );
             }
-            println!("using set list: {}", &set_list_df);
         }
 
         // if update_set_list is set we need to swap set range and create a flag.
