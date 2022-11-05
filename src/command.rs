@@ -50,11 +50,12 @@ pub struct Leget {
     all_years: bool,
 
     // TODO: default the reading of set_number_range from our csv
-    /// utilize the stored set_list.csv; should not be used in conjunction with --update-set-list
-    #[arg(long, default_value_t = true)]
-    use_set_list: bool,
+    /// opt out of using the stored set_list.csv which enabled by default
+    #[arg(long)]
+    skip_set_list: bool,
 
     // TODO: assert somewhere that the second must be > than the first
+    // TODO: could probably shorten this name
     /// scrape by set number. you must give a range
     #[arg(short, long, group = "set_range", num_args = 2)]
     set_number_range: Option<Vec<u32>>,
@@ -66,12 +67,27 @@ pub struct Leget {
 }
 
 impl Leget {
-    pub async fn exec(self) -> color_eyre::Result<()> {
+    pub async fn exec(mut self) -> color_eyre::Result<()> {
         let mut query = Query::new();
         let mut set_data = SetData::new();
 
         // We can scrape the site once our query settings are ready
         let client = reqwest::Client::new();
+
+        // Read in stored list of sets
+        // append doesn't work if dtypes are mismatched; defaults are mismatched on read of csv
+        let mut set_list_schema = Schema::new();
+        set_list_schema.with_column("set_number".to_string(), DataType::Utf8);
+        set_list_schema.with_column("year".to_string(), DataType::Utf8);
+        set_list_schema.with_column("pieces".to_string(), DataType::Float32);
+
+        // read in the set list
+        let mut set_list_df: DataFrame = CsvReader::from_path("set_list.csv")
+            .expect("A reader connection to set_list.csv")
+            .with_dtypes(Some(&set_list_schema))
+            .has_header(true)
+            .finish()
+            .expect("A polars DataFrame from set_list.csv");
 
         if self.all_years {
             query.set_all_years();
@@ -93,9 +109,19 @@ impl Leget {
             query.set_set_number_range(range.to_vec());
         }
 
-        // if update_set_list is set we need to swap set range and create a flag
+        // swap values for set list before update_set_list so they aren't clashing
+        if !self.skip_set_list {
+            println!("using set list: {}", &set_list_df);
+        }
+
+        // if update_set_list is set we need to swap set range and create a flag.
         let mut update_set_list_flag = false;
         if let Some(ref range) = self.update_set_list {
+            // you shouldn't use the set list to update itself.
+            if self.skip_set_list == false {
+                println!("Overriding --skip-set-list=false. You should not use the set list to update itself.");
+                self.skip_set_list = true;
+            }
             query.set_set_number_range(range.to_vec());
 
             update_set_list_flag = true;
@@ -406,13 +432,7 @@ impl Leget {
                 .expect("An executed LazyFrame for scanned sets.");
             println!("{}", &df);
 
-            // Read in stored list of sets
-            // append doesn't work if dtypes are mismatched; defaults are mismatched on read of csv
-            let mut set_list_schema = Schema::new();
-            set_list_schema.with_column("set_number".to_string(), DataType::Utf8);
-            set_list_schema.with_column("year".to_string(), DataType::Utf8);
-            set_list_schema.with_column("pieces".to_string(), DataType::Float32);
-
+            // read in the set list
             let mut set_list_df: DataFrame = CsvReader::from_path("set_list.csv")
                 .expect("A reader connection to set_list.csv")
                 .with_dtypes(Some(&set_list_schema))
