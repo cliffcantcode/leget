@@ -133,10 +133,18 @@ impl Leget {
                     col("set_number"),
                     col("sets_to_filter"),
                 );
-                println!(
-                    "joined DF: {:?}",
-                    joined_lf.collect().expect("The filtered df.")
-                );
+                let df = joined_lf.collect().expect("The filtered df.");
+                println!("joined DF: {:?}", &df);
+
+                // TODO: use this on actual results
+                let valid_sets: Vec<&str> = df
+                    .column("set_number")
+                    .expect("The Series of set_numbers.")
+                    .utf8()
+                    .expect("Parsed Series into Utf8.")
+                    .into_no_null_iter()
+                    .collect();
+                println!("valid_sets: {:?}", &valid_sets);
             }
         }
 
