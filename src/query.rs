@@ -11,14 +11,14 @@ fn current_year() -> u16 {
 // the filters that will be applied to our data
 pub struct Query {
     pub years: Option<Vec<u16>>,
-    pub set_number_range: Option<Vec<u32>>,
+    pub set_range: Option<Vec<u32>>,
 }
 
 impl Query {
     pub fn new() -> Self {
         Query {
             years: None,
-            set_number_range: None,
+            set_range: None,
         }
     }
 
@@ -32,8 +32,8 @@ impl Query {
         self.set_years(all_years);
     }
 
-    pub fn set_set_number_range(&mut self, set_numbers: Vec<u32>) {
-        let _ = self.set_number_range.take();
-        self.set_number_range = Some(set_numbers);
+    pub fn change_set_range(&mut self, set_numbers: Vec<u32>) {
+        let _ = self.set_range.take();
+        self.set_range = Some(set_numbers);
     }
 }

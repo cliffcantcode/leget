@@ -53,20 +53,28 @@ pub struct Leget {
     #[arg(long)]
     skip_set_list: bool,
 
-    // TODO: could probably shorten this name
     /// scrape by set number. you must give a range
-    #[arg(short = 'r', long, group = "set_range", num_args = 2)]
-    set_number_range: Option<Vec<u32>>,
+    #[arg(short = 'r', long, group = "sets", num_args = 2)]
+    set_range: Option<Vec<u32>>,
+
+    // default to 1200 due to shipping costs being main usage
+    /// the smallest number of pieces a set should have
+    #[arg(long, default_value_t = 1200)]
+    min_pieces: u32,
+
+    /// the largest number of pieces a set should have
+    #[arg(long, default_value_t = 1)]
+    max_pieces: u32,
 
     // TODO: this might want to be a subcommand
     /// use this to update the file that lists valid sets
-    #[arg(short = 'S', long, group = "set_range", num_args = 2)]
+    #[arg(short = 'S', long, group = "sets", num_args = 2)]
     update_set_list: Option<Vec<u32>>,
 }
 
 impl Leget {
     pub async fn exec(mut self) -> color_eyre::Result<()> {
-        if let Some(ref range) = self.set_number_range {
+        if let Some(ref range) = self.set_range {
             assert!(
                 range[0] < range[1],
                 "Range should be giving small -> large."
@@ -100,9 +108,9 @@ impl Leget {
             );
         }
 
-        // needs to be before we replace set_number_range with update_set_list
-        if let Some(ref range) = self.set_number_range {
-            query.set_set_number_range(range.to_vec());
+        // needs to be before we replace set_range with update_set_list
+        if let Some(ref range) = self.set_range {
+            query.change_set_range(range.to_vec());
         }
 
         // swap values for set list before update_set_list so they aren't clashing
@@ -120,7 +128,7 @@ impl Leget {
                 .lazy();
 
             // gather set range into a vec so we can make a df
-            if let Some(ref range) = query.set_number_range {
+            if let Some(ref range) = query.set_range {
                 let mut filter_sets: Vec<String> = vec![];
                 for set in range[0]..=range[1] {
                     let mut set: String = set.to_string();
@@ -142,7 +150,6 @@ impl Leget {
                 let df = joined_lf.collect().expect("The filtered df.");
                 println!("joined DF: {:?}", &df);
 
-                // TODO: use this on actual results
                 let mut set_vec: Vec<String> = df
                     .column("set_number")
                     .expect("The Series of set_numbers.")
@@ -167,13 +174,13 @@ impl Leget {
                 range[0] < range[1],
                 "Range should be giving small -> large."
             );
-            query.set_set_number_range(range.to_vec());
+            query.change_set_range(range.to_vec());
 
             update_set_list_flag = true;
         }
 
         // Scrape by set numbers
-        if let Some(range) = query.set_number_range {
+        if let Some(range) = query.set_range {
             for set_number in range[0]..=range[1] {
                 // check values against set_list
                 let mut set_number: String = set_number.to_string();
@@ -184,7 +191,8 @@ impl Leget {
 
                 let url = format!("https://www.brickeconomy.com/set/{}/", set_number);
 
-                // TODO: is there a way to get this to play nice with async?
+                // TODO: is there a way to get this to play nice with async? Maybe with a tower
+                // service?
                 throttle();
                 let response = client.get(url).send().await.expect("An async get request.");
 
@@ -407,7 +415,7 @@ impl Leget {
             }
         }
 
-        // TODO: make this iterate through all years in query
+        // TODO: year should either use the set_list or prompt to update the set list
         if let Some(years_vec) = query.years {
             let url = format!(
                 "https://www.brickeconomy.com/sets/year/{year}",
