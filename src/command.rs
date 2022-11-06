@@ -103,6 +103,8 @@ impl Leget {
 
         // swap values for set list before update_set_list so they aren't clashing
         // TODO: the names here are super confusing
+        // gather set range into a vec so we can make a df
+        let mut set_list: Vec<String> = vec![];
         if !self.skip_set_list {
             // read in the set list
             let set_list_lf: LazyFrame = CsvReader::from_path("set_list.csv")
@@ -137,14 +139,16 @@ impl Leget {
                 println!("joined DF: {:?}", &df);
 
                 // TODO: use this on actual results
-                let valid_sets: Vec<&str> = df
+                let mut set_vec: Vec<String> = df
                     .column("set_number")
                     .expect("The Series of set_numbers.")
                     .utf8()
                     .expect("Parsed Series into Utf8.")
                     .into_no_null_iter()
+                    .map(|s| s.to_string())
                     .collect();
-                println!("valid_sets: {:?}", &valid_sets);
+                set_list.append(set_vec.as_mut());
+                println!("set_list: {:?}", &set_list);
             }
         }
 
@@ -153,7 +157,7 @@ impl Leget {
         if let Some(ref range) = self.update_set_list {
             // you shouldn't use the set list to update itself.
             if !self.skip_set_list {
-                println!("Overriding --skip-set-list=false. You should not use the set list to update itself.");
+                println!("Setting --skip-set-list=true. You should not use the set list to update itself.");
                 self.skip_set_list = true;
             }
             query.set_set_number_range(range.to_vec());
@@ -164,10 +168,14 @@ impl Leget {
         // Scrape by set numbers
         if let Some(range) = query.set_number_range {
             for set_number in range[0]..=range[1] {
-                let url = format!(
-                    "https://www.brickeconomy.com/set/{number}-1/",
-                    number = set_number
-                );
+                // check values against set_list
+                let mut set_number: String = set_number.to_string();
+                set_number.push_str("-1");
+                if !self.skip_set_list && !&set_list.contains(&set_number) {
+                    continue;
+                }
+
+                let url = format!("https://www.brickeconomy.com/set/{}/", set_number);
 
                 // TODO: is there a way to get this to play nice with async?
                 throttle();
