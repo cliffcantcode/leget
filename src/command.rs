@@ -397,6 +397,14 @@ impl Leget {
                         .expect("The last value in set_data.set_number.")
                 );
             }
+            // sometimes there just isn't a place to get the data and
+            // we're on the last get request so the manual push misses
+            if set_data.set_number.len() > set_data.retail_price.len() {
+                set_data.retail_price.push(None);
+            }
+            if set_data.set_number.len() > set_data.pieces.len() {
+                set_data.pieces.push(None);
+            }
         }
 
         // TODO: make this iterate through all years in query
@@ -455,7 +463,11 @@ impl Leget {
         assert_eq!(
             &set_data.set_number.len(),
             &set_data.pieces.len(),
-            "Set number and pieces columns aren't the same length."
+            "Set number and pieces columns aren't the same length after set #{:?}.",
+            set_data
+                .set_number
+                .last()
+                .expect("The last value of set_data.set_number.")
         );
 
         let s_set_number = Series::new("set_number", &set_data.set_number);
@@ -522,6 +534,8 @@ impl Leget {
                 .filter(col("value").is_not_null())
                 // greater than covers nulls
                 .filter(col("pieces").gt(1))
+                // only for shipping, TODO: should probably make this an arg with a default of 1200
+                .filter(col("pieces").lt(1200))
                 .with_column(
                     ((col("listed_price") - col("value")) / col("value"))
                         .alias("percent_discount_from_value"),
