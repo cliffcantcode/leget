@@ -49,15 +49,13 @@ pub struct Leget {
     #[arg(long, group = "year")]
     all_years: bool,
 
-    // TODO: default the reading of set_number_range from our csv
     /// opt out of using the stored set_list.csv which enabled by default
     #[arg(long)]
     skip_set_list: bool,
 
-    // TODO: assert somewhere that the second must be > than the first
     // TODO: could probably shorten this name
     /// scrape by set number. you must give a range
-    #[arg(short, long, group = "set_range", num_args = 2)]
+    #[arg(short = 'r', long, group = "set_range", num_args = 2)]
     set_number_range: Option<Vec<u32>>,
 
     // TODO: this might want to be a subcommand
@@ -68,6 +66,12 @@ pub struct Leget {
 
 impl Leget {
     pub async fn exec(mut self) -> color_eyre::Result<()> {
+        if let Some(ref range) = self.set_number_range {
+            assert!(
+                range[0] < range[1],
+                "Range should be giving small -> large."
+            );
+        }
         let mut query = Query::new();
         let mut set_data = SetData::new();
 
@@ -155,11 +159,14 @@ impl Leget {
         // if update_set_list is set we need to swap set range and create a flag.
         let mut update_set_list_flag = false;
         if let Some(ref range) = self.update_set_list {
-            // you shouldn't use the set list to update itself.
             if !self.skip_set_list {
                 println!("Setting --skip-set-list=true. You should not use the set list to update itself.");
                 self.skip_set_list = true;
             }
+            assert!(
+                range[0] < range[1],
+                "Range should be giving small -> large."
+            );
             query.set_set_number_range(range.to_vec());
 
             update_set_list_flag = true;
