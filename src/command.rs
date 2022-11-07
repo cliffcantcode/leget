@@ -59,11 +59,11 @@ pub struct Leget {
 
     // default to 1200 due to shipping costs being main usage
     /// the smallest number of pieces a set should have
-    #[arg(long, default_value_t = 1200)]
+    #[arg(long, default_value_t = 1)]
     min_pieces: u32,
 
     /// the largest number of pieces a set should have
-    #[arg(long, default_value_t = 1)]
+    #[arg(long, default_value_t = 1200)]
     max_pieces: u32,
 
     // TODO: this might want to be a subcommand
@@ -541,9 +541,9 @@ impl Leget {
                 .filter(col("listed_price").is_not_null())
                 .filter(col("value").is_not_null())
                 // greater than covers nulls
-                .filter(col("pieces").gt(1))
-                // only for shipping, TODO: should probably make this an arg with a default of 1200
-                .filter(col("pieces").lt(1200))
+                .filter(col("pieces").gt(self.min_pieces))
+                // only for shipping
+                .filter(col("pieces").lt(self.max_pieces))
                 .with_column(
                     ((col("listed_price") - col("value")) / col("value"))
                         .alias("percent_discount_from_value"),
