@@ -39,6 +39,7 @@ lazy_static! {
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
 pub struct Leget {
+    // TODO: years don't really work well, based them off of set_list
     // try to limit inputs to just valid years
     /// the year made of sets you want to scan for. e.g. 2020 2021 2022 etc.
     #[arg(value_parser = clap::value_parser!(u16).range(1949..2200))]
@@ -485,12 +486,23 @@ impl Leget {
         let s_listed_price = Series::new("listed_price", &set_data.listed_price);
         let s_pieces = Series::new("pieces", &set_data.pieces);
 
+        // TODO: DRY
+        let mut df: DataFrame = DataFrame::new(vec![
+            s_set_number,
+            s_name,
+            s_year,
+            s_retail_price,
+            s_value,
+            s_listed_price,
+            s_pieces,
+        ])
+        .expect("A Polars DataFrame.");
+
         // do everything else, but control the output
         if update_set_list_flag {
-            let mut df: DataFrame =
-                DataFrame::new(vec![s_set_number, s_year, s_pieces]).expect("A Polars DataFrame.");
-
-            let mut lf: LazyFrame = df.clone().lazy();
+            let mut lf: LazyFrame =
+                df.lazy()
+                    .select(&[col("set_number"), col("year"), col("pieces")]);
             lf = lf
                 // greater than covers nulls
                 .filter(col("pieces").gt(1));
@@ -498,7 +510,6 @@ impl Leget {
             df = lf
                 .collect()
                 .expect("An executed LazyFrame for scanned sets.");
-            println!("{}", &df);
 
             // read in the set list
             let mut set_list_df: DataFrame = CsvReader::from_path("set_list.csv")
@@ -524,19 +535,8 @@ impl Leget {
                 .finish(&mut set_list_df)
                 .expect("The writting of our data to set_list.csv");
         } else {
-            // TODO: DRY
-            let df: PolarsResult<DataFrame> = DataFrame::new(vec![
-                s_set_number,
-                s_name,
-                s_year,
-                s_retail_price,
-                s_value,
-                s_listed_price,
-                s_pieces,
-            ]);
-
-            let lf: LazyFrame = df.expect("A Polars DataFrame.").lazy();
-            let lf = lf
+            let mut lf: LazyFrame = df.lazy();
+            lf = lf
                 .filter(col("listed_price").is_not_null())
                 .filter(col("value").is_not_null())
                 // greater than covers nulls
@@ -553,13 +553,13 @@ impl Leget {
                         .alias("percent_discount_from_value_per_piece"),
                 )
                 .sort("percent_discount_from_value_per_piece", Default::default());
-            let mut lf = lf.collect().expect("An executed LazyFrame.");
-            println!("{}", &lf);
+            df = lf.collect().expect("An executed LazyFrame.");
+            println!("{}", &df);
 
             let legot_csv = File::create("legot.csv").expect("The creation of the legot.csv");
             let mut writer: CsvWriter<File> = CsvWriter::new(legot_csv).has_header(true);
             writer
-                .finish(&mut lf)
+                .finish(&mut df)
                 .expect("The writting of our data to legot.csv");
         }
 
