@@ -185,6 +185,7 @@ impl Leget {
                 // check values against set_list
                 let mut set_number: String = set_number.to_string();
                 set_number.push_str("-1");
+                assert!(!self.skip_set_list && !&set_list.is_empty(), "You're attempting to use an empty set list. You might need to use --update-set-list.");
                 if !self.skip_set_list && !&set_list.contains(&set_number) {
                     continue;
                 }
@@ -486,7 +487,6 @@ impl Leget {
         let s_listed_price = Series::new("listed_price", &set_data.listed_price);
         let s_pieces = Series::new("pieces", &set_data.pieces);
 
-        // TODO: DRY
         let mut df: DataFrame = DataFrame::new(vec![
             s_set_number,
             s_name,
