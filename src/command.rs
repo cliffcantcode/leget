@@ -185,7 +185,11 @@ impl Leget {
                 // check values against set_list
                 let mut set_number: String = set_number.to_string();
                 set_number.push_str("-1");
-                assert!(!self.skip_set_list && !&set_list.is_empty(), "You're attempting to use an empty set list. You might need to use --update-set-list.");
+                if !self.skip_set_list && set_list.is_empty() {
+                    println!("You're attempting to use an empty set list. You might need to use --update-set-list.");
+                    println!("Setting --skip-set-list=true.");
+                    self.skip_set_list = true;
+                }
                 if !self.skip_set_list && !&set_list.contains(&set_number) {
                     continue;
                 }
