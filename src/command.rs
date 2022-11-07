@@ -46,10 +46,6 @@ pub struct Leget {
     #[arg(short, long, group="year", num_args=1..100)]
     years: Option<Vec<u16>>,
 
-    /// scan full range of years from 1949 (oldest on brickeconomy)
-    #[arg(long, group = "year")]
-    all_years: bool,
-
     /// opt out of using the stored set_list.csv which enabled by default
     #[arg(long)]
     skip_set_list: bool,
@@ -93,10 +89,6 @@ impl Leget {
         set_list_schema.with_column("set_number".to_string(), DataType::Utf8);
         set_list_schema.with_column("year".to_string(), DataType::Utf8);
         set_list_schema.with_column("pieces".to_string(), DataType::Float32);
-
-        if self.all_years {
-            query.set_all_years();
-        }
 
         if let Some(years) = self.years {
             query.set_years(years);

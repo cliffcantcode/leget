@@ -8,5 +8,3 @@ mod set_data;
 
 #[doc(hidden)]
 pub use command::Leget;
-
-const MIN_YEAR_BRICK_ECONOMY: u16 = 1949;
