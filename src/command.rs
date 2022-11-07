@@ -142,13 +142,12 @@ impl Leget {
                 .expect("A DataFrame of my sets to filter to.")
                 .lazy();
 
-                let joined_lf = set_list_lf.inner_join(
-                    filter_sets_lf,
-                    col("set_number"),
-                    col("sets_to_filter"),
-                );
+                let joined_lf = set_list_lf
+                    // filters here should effect final list via inner join
+                    .filter(col("pieces").lt(self.max_pieces))
+                    .filter(col("pieces").gt(self.min_pieces))
+                    .inner_join(filter_sets_lf, col("set_number"), col("sets_to_filter"));
                 let df = joined_lf.collect().expect("The filtered df.");
-                println!("joined DF: {:?}", &df);
 
                 let mut set_vec: Vec<String> = df
                     .column("set_number")
