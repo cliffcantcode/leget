@@ -10,7 +10,7 @@ chrono = "0.4.22"
 clap = { version = "4.0.18", features = ["derive"] }
 color-eyre = "0.6.2"
 lazy_static = "1.4.0"
-polars = { version = "0.25.1", features = ["lazy"] }
+polars = { version = "0.25.1", features = ["lazy", "is_in"] }
 regex = "1.6.0"
 reqwest = { version = "0.11.12", features = ["json", "blocking"] }
 scraper = "0.13.0"

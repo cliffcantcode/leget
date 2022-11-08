@@ -50,6 +50,7 @@ pub struct Leget {
     #[arg(long)]
     skip_set_list: bool,
 
+    // TODO: could make this default to the set list min/max if another filter is given
     /// scrape by set number. you must give a range
     #[arg(short = 'r', long, group = "sets", num_args = 2)]
     set_range: Option<Vec<u32>>,
@@ -106,20 +107,19 @@ impl Leget {
             query.change_set_range(range.to_vec());
         }
 
-        // swap values for set list before update_set_list so they aren't clashing
         // TODO: the names here are super confusing
+        // read in the set list
+        let set_list_lf: LazyFrame = CsvReader::from_path("set_list.csv")
+            .expect("A reader connection to set_list.csv")
+            .with_dtypes(Some(&set_list_schema))
+            .has_header(true)
+            .finish()
+            .expect("A polars DataFrame from set_list.csv")
+            .lazy();
+
         // gather set range into a vec so we can make a df
         let mut set_list: Vec<String> = vec![];
         if !self.skip_set_list {
-            // read in the set list
-            let set_list_lf: LazyFrame = CsvReader::from_path("set_list.csv")
-                .expect("A reader connection to set_list.csv")
-                .with_dtypes(Some(&set_list_schema))
-                .has_header(true)
-                .finish()
-                .expect("A polars DataFrame from set_list.csv")
-                .lazy();
-
             // gather set range into a vec so we can make a df
             if let Some(ref range) = query.set_range {
                 let mut filter_sets: Vec<String> = vec![];
@@ -140,7 +140,26 @@ impl Leget {
                     .filter(col("pieces").lt(self.max_pieces))
                     .filter(col("pieces").gt(self.min_pieces))
                     .inner_join(filter_sets_lf, col("set_number"), col("sets_to_filter"));
-                let df = joined_lf.collect().expect("The filtered df.");
+                // check for any years provided
+                let df = if let Some(ref year_vec) = query.years {
+                    let year_vec = year_vec
+                        .iter()
+                        .map(|n| n.to_string())
+                        .collect::<Vec<String>>();
+                    let s_years: Series = Series::new("year", &year_vec);
+                    let year_lf: LazyFrame = DataFrame::new(vec![s_years])
+                        .expect("A polars df of years.")
+                        .lazy();
+
+                    let df = joined_lf
+                        .inner_join(year_lf, col("year"), col("year"))
+                        .collect()
+                        .expect("The df filtered by year.");
+                    df
+                } else {
+                    let df = joined_lf.collect().expect("The filtered df.");
+                    df
+                };
 
                 let mut set_vec: Vec<String> = df
                     .column("set_number")
