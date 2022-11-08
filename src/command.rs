@@ -39,7 +39,6 @@ lazy_static! {
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
 pub struct Leget {
-    // TODO: years don't really work well, based them off of set_list
     // try to limit inputs to just valid years
     /// the year made of sets you want to scan for. e.g. 2020 2021 2022 etc.
     #[arg(value_parser = clap::value_parser!(u16).range(1949..2200))]
@@ -50,7 +49,6 @@ pub struct Leget {
     #[arg(long)]
     skip_set_list: bool,
 
-    // TODO: could make this default to the set list min/max if another filter is given
     /// scrape by set number. you must give a range
     #[arg(short = 'r', long, group = "sets", num_args = 2)]
     set_range: Option<Vec<u32>>,
@@ -91,15 +89,9 @@ impl Leget {
         set_list_schema.with_column("year".to_string(), DataType::Utf8);
         set_list_schema.with_column("pieces".to_string(), DataType::Float32);
 
+        // initialize year for querying data later
         if let Some(years) = self.years {
             query.set_years(years);
-        }
-
-        if query.years.is_some() {
-            println!(
-                "{:?}",
-                query.years.as_ref().expect("A reference to query.years")
-            );
         }
 
         // needs to be before we replace set_range with update_set_list
@@ -151,14 +143,12 @@ impl Leget {
                         .expect("A polars df of years.")
                         .lazy();
 
-                    let df = joined_lf
+                    joined_lf
                         .inner_join(year_lf, col("year"), col("year"))
                         .collect()
-                        .expect("The df filtered by year.");
-                    df
+                        .expect("The df filtered by year.")
                 } else {
-                    let df = joined_lf.collect().expect("The filtered df.");
-                    df
+                    joined_lf.collect().expect("The filtered df.")
                 };
 
                 let mut set_vec: Vec<String> = df
@@ -170,6 +160,10 @@ impl Leget {
                     .map(|s| s.to_string())
                     .collect();
                 set_list.append(set_vec.as_mut());
+                if !self.skip_set_list {
+                    // TODO: need a more certain way to say "your years are making the set list empty"
+                    assert!(!set_list.is_empty(), "Set list is empty. The years given are either not in range or the --update-set-list needs to be run.");
+                }
                 println!("set_list: {:?}", &set_list);
             }
         }
@@ -429,33 +423,6 @@ impl Leget {
             if set_data.set_number.len() > set_data.pieces.len() {
                 set_data.pieces.push(None);
             }
-        }
-
-        // TODO: year should either use the set_list or prompt to update the set list
-        if let Some(years_vec) = query.years {
-            let url = format!(
-                "https://www.brickeconomy.com/sets/year/{year}",
-                year = years_vec[0]
-            );
-
-            let response = client.get(url).send().await.expect("An async get request.");
-
-            match response.status() {
-                reqwest::StatusCode::OK => {
-                    let content = response
-                        .text()
-                        .await
-                        .expect("The text response of the year's get request.");
-                    let document = Html::parse_document(&content);
-                    let h4 = document.select(&H4_A);
-                    for item in h4 {
-                        println!("{}", item.inner_html());
-                    }
-                }
-                problem => {
-                    panic!("There was a problem: {:?}", problem);
-                }
-            };
         }
 
         // make sure the index len is the same before we make a dataframe
