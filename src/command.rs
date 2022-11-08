@@ -1,6 +1,5 @@
 //! Command line parsing and logic
 
-use crate::query::Query;
 use crate::scraper_utils::{make_selector, throttle};
 use crate::set_data::SetData;
 
@@ -69,6 +68,11 @@ pub struct Leget {
 }
 
 impl Leget {
+    fn change_set_range(&mut self, set_numbers: Vec<u32>) {
+        let _ = self.set_range.take();
+        self.set_range = Some(set_numbers);
+    }
+
     pub async fn exec(mut self) -> color_eyre::Result<()> {
         if let Some(ref range) = self.set_range {
             assert!(
@@ -76,10 +80,9 @@ impl Leget {
                 "Range should be giving small -> large."
             );
         }
-        let mut query = Query::new();
         let mut set_data = SetData::new();
 
-        // We can scrape the site once our query settings are ready
+        // We can scrape the site with a stays-alive connection
         let client = reqwest::Client::new();
 
         // Read in stored list of sets
@@ -88,16 +91,6 @@ impl Leget {
         set_list_schema.with_column("set_number".to_string(), DataType::Utf8);
         set_list_schema.with_column("year".to_string(), DataType::Utf8);
         set_list_schema.with_column("pieces".to_string(), DataType::Float32);
-
-        // initialize year for querying data later
-        if let Some(years) = self.years {
-            query.set_years(years);
-        }
-
-        // needs to be before we replace set_range with update_set_list
-        if let Some(ref range) = self.set_range {
-            query.change_set_range(range.to_vec());
-        }
 
         // TODO: the names here are super confusing
         // read in the set list
@@ -113,7 +106,7 @@ impl Leget {
         let mut set_list: Vec<String> = vec![];
         if !self.skip_set_list {
             // gather set range into a vec so we can make a df
-            if let Some(ref range) = query.set_range {
+            if let Some(ref range) = self.set_range {
                 let mut filter_sets: Vec<String> = vec![];
                 for set in range[0]..=range[1] {
                     let mut set: String = set.to_string();
@@ -133,7 +126,7 @@ impl Leget {
                     .filter(col("pieces").gt(self.min_pieces))
                     .inner_join(filter_sets_lf, col("set_number"), col("sets_to_filter"));
                 // check for any years provided
-                let df = if let Some(ref year_vec) = query.years {
+                let df = if let Some(ref year_vec) = self.years {
                     let year_vec = year_vec
                         .iter()
                         .map(|n| n.to_string())
@@ -161,7 +154,6 @@ impl Leget {
                     .collect();
                 set_list.append(set_vec.as_mut());
                 if !self.skip_set_list {
-                    // TODO: need a more certain way to say "your years are making the set list empty"
                     assert!(!set_list.is_empty(), "Set list is empty. The years given are either not in range or the --update-set-list needs to be run.");
                 }
                 println!("set_list: {:?}", &set_list);
@@ -179,13 +171,13 @@ impl Leget {
                 range[0] < range[1],
                 "Range should be giving small -> large."
             );
-            query.change_set_range(range.to_vec());
+            self.change_set_range(range.to_vec());
 
             update_set_list_flag = true;
         }
 
         // Scrape by set numbers
-        if let Some(range) = query.set_range {
+        if let Some(range) = self.set_range {
             for set_number in range[0]..=range[1] {
                 // check values against set_list
                 let mut set_number: String = set_number.to_string();
