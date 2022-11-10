@@ -103,19 +103,19 @@ impl Leget {
             .lazy();
 
         // gather set range into a vec so we can make a df
-        let mut set_list: Vec<String> = vec![];
+        let mut set_list_vec: Vec<String> = vec![];
         if !self.skip_set_list {
             // gather set range into a vec so we can make a df
             if let Some(ref range) = self.set_range {
-                let mut filter_sets: Vec<String> = vec![];
+                let mut sets: Vec<String> = vec![];
                 for set in range[0]..=range[1] {
                     let mut set: String = set.to_string();
                     set.push_str("-1");
-                    filter_sets.push(set);
+                    sets.push(set);
                 }
 
-                let filter_sets_lf: LazyFrame = df! {
-                    "sets_to_filter" => filter_sets,
+                let sets_lf: LazyFrame = df! {
+                    "set_number" => sets,
                 }
                 .expect("A DataFrame of my sets to filter to.")
                 .lazy();
@@ -124,7 +124,7 @@ impl Leget {
                     // filters here should effect final list via inner join
                     .filter(col("pieces").lt(self.max_pieces))
                     .filter(col("pieces").gt(self.min_pieces))
-                    .inner_join(filter_sets_lf, col("set_number"), col("sets_to_filter"));
+                    .inner_join(sets_lf, col("set_number"), col("set_number"));
                 // check for any years provided
                 let df = if let Some(ref year_vec) = self.years {
                     let year_vec = year_vec
@@ -152,11 +152,11 @@ impl Leget {
                     .into_no_null_iter()
                     .map(|s| s.to_string())
                     .collect();
-                set_list.append(set_vec.as_mut());
+                set_list_vec.append(set_vec.as_mut());
                 if !self.skip_set_list {
-                    assert!(!set_list.is_empty(), "Set list is empty. The years given are either not in range or the --update-set-list needs to be run.");
+                    assert!(!set_list_vec.is_empty(), "Set list is empty. The years given are either not in range or the --update-set-list needs to be run.");
                 }
-                println!("set_list: {:?}", &set_list);
+                println!("set_list: {:?}", &set_list_vec);
             }
         }
 
@@ -182,12 +182,12 @@ impl Leget {
                 // check values against set_list
                 let mut set_number: String = set_number.to_string();
                 set_number.push_str("-1");
-                if !self.skip_set_list && set_list.is_empty() {
+                if !self.skip_set_list && set_list_vec.is_empty() {
                     println!("You're attempting to use an empty set list. You might need to use --update-set-list.");
                     println!("Setting --skip-set-list=true.");
                     self.skip_set_list = true;
                 }
-                if !self.skip_set_list && !&set_list.contains(&set_number) {
+                if !self.skip_set_list && !&set_list_vec.contains(&set_number) {
                     continue;
                 }
 
