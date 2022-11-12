@@ -222,6 +222,26 @@ impl Leget {
                                 .last()
                                 .expect("The last value of set_data.set_number.")
                         );
+                        // sometimes the value isn't there
+                        if set_data.set_number.len() > set_data.value.len() {
+                            set_data.value.push(None);
+                            println!(
+                                "last set: {:?}",
+                                set_data
+                                    .set_number
+                                    .last()
+                                    .expect("The last value in set_data.set_number.")
+                            )
+                        }
+                        assert_eq!(
+                            &set_data.set_number.len(),
+                            &set_data.value.len(),
+                            "Set number and pieces columns aren't the same length after set #{:?}.",
+                            set_data
+                                .set_number
+                                .last()
+                                .expect("The last value of set_data.set_number.")
+                        );
                         // sometimes there just isn't a place to get the retail price
                         if set_data.set_number.len() > set_data.retail_price.len() {
                             set_data.retail_price.push(None);
@@ -396,11 +416,16 @@ impl Leget {
                         panic!("There was a problem: {:?}", problem);
                     }
                 }
+                // sometimes the value isn't there
+                if set_data.set_number.len() > set_data.value.len() {
+                    set_data.value.push(None);
+                }
                 // need to catch if the html is being missed somewhere
+                // TODO: could probably clean up some alerts
                 assert_eq!(
                     &set_data.set_number.len(),
-                    &set_data.value.len(),
-                    "Set number and value columns aren't the same length after set #{:?}.",
+                    &set_data.year.len(),
+                    "Set number and year columns aren't the same length after set #{:?}.",
                     set_data
                         .set_number
                         .last()
@@ -411,6 +436,9 @@ impl Leget {
             // we're on the last get request so the manual push misses
             if set_data.set_number.len() > set_data.retail_price.len() {
                 set_data.retail_price.push(None);
+            }
+            if set_data.set_number.len() > set_data.value.len() {
+                set_data.value.push(None);
             }
             if set_data.set_number.len() > set_data.pieces.len() {
                 set_data.pieces.push(None);

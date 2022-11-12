@@ -17,6 +17,8 @@ something like this:
 
 	git clone https://github.com/cliffcantcode/leget.git
 
+if you don't want to install git you could just download the code as a ZIP file.
+
 #### 2. have the rust programming language installed
 
 from here: https://www.rust-lang.org/  
@@ -25,7 +27,7 @@ you should be able to just follow the instructions for the lastest version.
 
 #### 3. compile the code to a binary
 
-in the terminal move into the leget directory and run:  
+open a terminal and move into the leget directory and run:  
 
 	cargo build --release  
 
