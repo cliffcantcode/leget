@@ -92,7 +92,6 @@ impl Leget {
         set_list_schema.with_column("year".to_string(), DataType::Utf8);
         set_list_schema.with_column("pieces".to_string(), DataType::Float32);
 
-        // TODO: the names here are super confusing
         // read in the set list
         let set_list_lf: LazyFrame = CsvReader::from_path("set_list.csv")
             .expect("A reader connection to set_list.csv")
@@ -156,7 +155,6 @@ impl Leget {
                 if !self.skip_set_list {
                     assert!(!set_list_vec.is_empty(), "Set list is empty. The years given are either not in range or the --update-set-list needs to be run.");
                 }
-                println!("set_list: {:?}", &set_list_vec);
             }
         }
 
@@ -529,6 +527,7 @@ impl Leget {
                 .expect("A DataFrame with no duplicate set numbers.")
                 .sort(["set_number"], false)
                 .expect("A asc sorted DataFrame by set number.");
+            // TODO: these should probably be behind a --silent flag
             println!("set_list_df: {}", &set_list_df);
 
             let set_list = File::create("set_list.csv").expect("The creation of the set_list.csv");
