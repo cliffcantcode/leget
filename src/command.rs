@@ -111,7 +111,7 @@ impl Leget {
                     .clone()
                     .collect()
                     .expect("LazyFrame is no a DataFrame.");
-                let range_max = set_df
+                let range_max: u32 = set_df
                     .column("set_number")
                     .expect("The set numbers column.")
                     .utf8()
@@ -119,19 +119,20 @@ impl Leget {
                     .into_no_null_iter()
                     // need to remove the "-1" from the set so it can become a number
                     .map(|s| s[0..s.len() - 2].parse::<u32>().expect("{s} as a u32."))
-                    .max();
+                    .max()
+                    .expect("The max set number in the set_list.");
 
                 println!("range_max: {:?}", &range_max);
-                self.set_range = Some(vec![10000, 10050]);
+                self.set_range = Some(vec![0, range_max]);
             }
             // gather set range into a vec so we can make a df
-            // TODO: can we refactor this to be faster?
             if let Some(ref range) = self.set_range {
-                let mut sets: Vec<String> = vec![];
+                let range_size: usize = (range[1] - range[0] + 1)
+                    .try_into()
+                    .expect("range len as usize.");
+                let mut sets: Vec<String> = Vec::with_capacity(range_size);
                 for set in range[0]..=range[1] {
-                    let mut set: String = set.to_string();
-                    set.push_str("-1");
-                    sets.push(set);
+                    sets.push(format!("{set}-1"));
                 }
 
                 let sets_lf: LazyFrame = df! {
