@@ -104,7 +104,28 @@ impl Leget {
         // gather set range into a vec so we can make a df
         let mut set_list_vec: Vec<String> = vec![];
         if !self.skip_set_list {
+            // if a set_range wasn't given we need to provide a maximal one
+            if self.set_range.is_none() {
+                println!("warning: no set range given so setting a maximum set range. This will be take a while if no other filters are given.");
+                let set_df = set_list_lf
+                    .clone()
+                    .collect()
+                    .expect("LazyFrame is no a DataFrame.");
+                let range_max = set_df
+                    .column("set_number")
+                    .expect("The set numbers column.")
+                    .utf8()
+                    .expect("set numbers as utf8.")
+                    .into_no_null_iter()
+                    // need to remove the "-1" from the set so it can become a number
+                    .map(|s| s[0..s.len() - 2].parse::<u32>().expect("{s} as a u32."))
+                    .max();
+
+                println!("range_max: {:?}", &range_max);
+                self.set_range = Some(vec![10000, 10050]);
+            }
             // gather set range into a vec so we can make a df
+            // TODO: can we refactor this to be faster?
             if let Some(ref range) = self.set_range {
                 let mut sets: Vec<String> = vec![];
                 for set in range[0]..=range[1] {
@@ -124,6 +145,7 @@ impl Leget {
                     .filter(col("pieces").lt(self.max_pieces))
                     .filter(col("pieces").gt(self.min_pieces))
                     .inner_join(sets_lf, col("set_number"), col("set_number"));
+
                 // check for any years provided
                 let df = if let Some(ref year_vec) = self.years {
                     let year_vec = year_vec
