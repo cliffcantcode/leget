@@ -122,7 +122,7 @@ impl Leget {
                     .max()
                     .expect("The max set number in the set_list.");
 
-                println!("range_max: {:?}", &range_max);
+                println!("range_max: set # {:?}-1", &range_max);
                 self.set_range = Some(vec![0, range_max]);
             }
             // gather set range into a vec so we can make a df
